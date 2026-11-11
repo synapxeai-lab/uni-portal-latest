@@ -13,6 +13,8 @@ export interface AdminUserSummary {
   image: string | null;
   /** Whether an admin can view this user's current password. */
   hasViewablePassword: boolean;
+  /** Whether a teacher/student has their academic record; null for admins. */
+  academicRecord: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 }

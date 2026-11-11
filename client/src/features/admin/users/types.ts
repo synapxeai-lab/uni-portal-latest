@@ -12,6 +12,7 @@ export interface AdminUserSummary {
   mustChangePassword: boolean;
   image: string | null;
   hasViewablePassword: boolean;
+  academicRecord: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 }

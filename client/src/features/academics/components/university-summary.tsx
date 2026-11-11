@@ -171,7 +171,7 @@ export function UniversitySummary() {
   return (
     <DashboardSection title="My studies">
       <div className="flex flex-col gap-4">
-        <TermBanner {...summary} registerHref="/registration" />
+        <TermBanner {...summary} registerHref={profile ? "/registration" : undefined} />
         {profile ? (
           <DashboardStatGrid>
             <StatCard

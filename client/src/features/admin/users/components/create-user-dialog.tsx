@@ -55,7 +55,9 @@ export function CreateUserDialog({ open, onOpenChange, onCreated }: CreateUserDi
             <DialogTitle>Create user</DialogTitle>
             <DialogDescription>
               A temporary password is generated automatically - the new user must set their own on
-              first sign-in.
+              first sign-in. For a student or teacher, use the Students or Teachers page instead: it
+              creates the login together with their academic record (programme, batch, section),
+              which registration, attendance, marks and fees need.
             </DialogDescription>
           </DialogHeader>
 

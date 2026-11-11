@@ -179,3 +179,60 @@ describe("deleting a registered student", () => {
     expect(await people()).not.toContain(created.data.login.email);
   });
 });
+
+describe("a student login created on the Users page", () => {
+  it("gets a clear no-record answer until the admin adds their record, then can register", async () => {
+    const admin = await signIn("admin");
+    const email = `${unique("userspage")}@eithm.edu.pk`;
+    const created = await admin.post<{ user: { id: string; academicRecord: boolean | null }; temporaryPassword: string }>(
+      "/admin/users",
+      { name: "Users Page Student", email, role: "STUDENT" },
+    );
+    expect(created.data.user.academicRecord).toBe(false);
+
+    const student = await new ApiSession().login(email, created.data.temporaryPassword);
+    await student.post("/account/password", {
+      currentPassword: created.data.temporaryPassword,
+      newPassword: "Student12345",
+      confirmPassword: "Student12345",
+    });
+    const before = await student.request<unknown>("GET", "/my/registration");
+    expect(before.status).toBe(404);
+    expect(before.body).toHaveProperty("code", "NO_PROFILE");
+    const summary = await student.get<{ profile: unknown }>("/university/summary");
+    expect(summary.data.profile).toBeNull();
+
+    // Adding the student record with the same email links this login (no new one).
+    const record = await admin.post<{ student: { id: number; userId: string }; login: unknown }>("/students", {
+      name: "Users Page Student",
+      rollNo: unique("UP"),
+      email,
+      phone: "0300",
+      address: "Lahore",
+      cnic: cnic(),
+      dob: "2005-01-01",
+      gender: "MALE",
+      lastQualification: "FSc",
+      passingYear: 2024,
+      grade: "A",
+      university: "BISE",
+      programme: "TOURISM",
+      batch: "2026",
+      section: "A",
+      guardianName: "G",
+      guardianContact: "0300",
+      guardianCnic: cnic(),
+      guardianRelationship: "Father",
+      guardianEmail: "g@example.com",
+    });
+    expect(record.data.login).toBeNull();
+    expect(record.data.student.userId).toBe(created.data.user.id);
+
+    const page = await student.get<MyRegistration>("/my/registration");
+    expect(page.data.registrationOpen).toBe(true);
+    const course = page.data.courses[0];
+    expect((await student.post("/my/registration", { courseId: course.id, sectionId: course.defaultSectionId })).status).toBe(201);
+
+    await admin.delete(`/students/${record.data.student.id}`);
+  });
+});

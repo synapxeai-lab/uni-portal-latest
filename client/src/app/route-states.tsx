@@ -2,8 +2,11 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import { PageContainer } from "@/components/page/page-container";
+import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
-import { isNotFoundError } from "@/lib/api";
+import { UserRoundX } from "lucide-react";
+
+import { getApiError, isNotFoundError } from "@/lib/api";
 
 import { NotFoundPage } from "./not-found-page";
 
@@ -28,6 +31,19 @@ export function QueryView<T>({
     return <>{children(query.data)}</>;
   }
   if (query.isError) {
+    // A teacher/student login without its academic record (e.g. created on the
+    // Users page): say so, rather than "page not found".
+    if (getApiError(query.error)?.code === "NO_PROFILE") {
+      return (
+        <PageContainer>
+          <EmptyState
+            icon={UserRoundX}
+            title="Your academic record isn't set up yet"
+            description={`${getApiError(query.error)!.message} Once it is, your courses, registration, attendance, marks and fees appear here.`}
+          />
+        </PageContainer>
+      );
+    }
     if (isNotFoundError(query.error)) {
       return <>{notFound !== undefined ? notFound : <NotFoundPage />}</>;
     }

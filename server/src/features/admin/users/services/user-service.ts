@@ -29,6 +29,8 @@ const summarySelect = {
   mustChangePassword: true,
   image: true,
   passwordEnc: true,
+  teacherProfile: { select: { id: true } },
+  studentProfile: { select: { id: true } },
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -45,6 +47,10 @@ function toSummary(user: UserSummaryRow): AdminUserSummary {
     mustChangePassword: user.mustChangePassword,
     image: user.image,
     hasViewablePassword: user.passwordEnc !== null,
+    // Teachers and students need their academic record (Teachers / Students
+    // pages) before their courses, registration and fees work.
+    academicRecord:
+      user.role === "ADMIN" ? null : Boolean(user.teacherProfile ?? user.studentProfile),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

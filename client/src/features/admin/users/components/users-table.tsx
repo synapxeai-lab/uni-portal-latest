@@ -137,7 +137,19 @@ export function UsersTable({ users, currentUserId, sortField, sortDir }: UsersTa
             </TableCell>
             <TableCell className="text-muted-foreground">{user.email}</TableCell>
             <TableCell>
-              <Badge variant={roleBadgeVariant[user.role]}>{roleLabels[user.role]}</Badge>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant={roleBadgeVariant[user.role]}>{roleLabels[user.role]}</Badge>
+                {user.academicRecord === false ? (
+                  // A login without its teacher/student record: courses, registration
+                  // and fees need it. Adding the record with the same email links this login.
+                  <Link
+                    href={user.role === "TEACHER" ? "/admin/teachers" : "/admin/students"}
+                    title="Add their record with this same email to link this login"
+                  >
+                    <Badge variant="warning">No {user.role === "TEACHER" ? "teacher" : "student"} record</Badge>
+                  </Link>
+                ) : null}
+              </div>
             </TableCell>
             <TableCell>
               <Badge variant={statusBadgeVariant[user.status]}>{statusLabels[user.status]}</Badge>
