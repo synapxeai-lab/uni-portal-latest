@@ -70,7 +70,7 @@ interface RecordAuditEventInput {
   action: ActivityAction;
   entityType: AuditEntityType;
   entityId: string;
-  /** Human-readable snapshot of the target, e.g. "Sofia Chen (sofia.student@gcr.dev)". */
+  /** Human-readable snapshot of the target, e.g. "Ali Raza (ali.raza@eithm.edu.pk)". */
   targetLabel: string;
   classroomId?: string;
   metadata?: Record<string, unknown>;

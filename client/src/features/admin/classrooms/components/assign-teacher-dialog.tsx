@@ -73,7 +73,7 @@ export function AssignTeacherDialog({
               type="email"
               required
               autoFocus
-              placeholder="teacher@gcr.dev"
+              placeholder="teacher@eithm.edu.pk"
             />
             {fieldErrors?.teacherEmail ? (
               <p className="text-xs text-destructive">{fieldErrors.teacherEmail[0]}</p>

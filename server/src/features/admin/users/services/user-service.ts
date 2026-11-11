@@ -1,6 +1,7 @@
 import type { SessionUser } from "@/auth/session";
 import { generateTemporaryPassword } from "@/lib/auth/generate-password";
-import { hashPassword } from "@/lib/auth/password";
+import { passwordFields } from "@/lib/auth/password";
+import { decryptPassword } from "@/lib/auth/password-vault";
 import { recordAuditEvent } from "@/lib/audit-log";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
@@ -27,6 +28,7 @@ const summarySelect = {
   status: true,
   mustChangePassword: true,
   image: true,
+  passwordEnc: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -42,6 +44,7 @@ function toSummary(user: UserSummaryRow): AdminUserSummary {
     status: user.status,
     mustChangePassword: user.mustChangePassword,
     image: user.image,
+    hasViewablePassword: user.passwordEnc !== null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -145,14 +148,14 @@ export async function createUser(
   await assertEmailAvailable(input.email);
 
   const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await hashPassword(temporaryPassword);
+  const passwordData = await passwordFields(temporaryPassword);
 
   const user = await prisma.user.create({
     data: {
       name: input.name,
       email: input.email,
       role: input.role,
-      passwordHash,
+      ...passwordData,
       status: UserStatus.ACTIVE,
       // Admin-created accounts always start with a system-generated password,
       // so the new user is required to set their own on first sign-in.
@@ -285,11 +288,11 @@ export async function resetPassword(
   }
 
   const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await hashPassword(temporaryPassword);
+  const passwordData = await passwordFields(temporaryPassword);
 
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash, mustChangePassword: true },
+    data: { ...passwordData, mustChangePassword: true },
   });
 
   await recordAuditEvent({
@@ -327,4 +330,18 @@ export async function forcePasswordChange(userId: string, actor: SessionUser): P
     where: { id: userId },
     data: { status: UserStatus.PENDING_PASSWORD_CHANGE, mustChangePassword: true },
   });
+}
+
+/**
+ * The user's current password, decrypted from the admin-viewable copy - the
+ * University Portal's "show password" on the Users page. null when the
+ * password was set before copies were kept (or under another key); the admin
+ * resets it to get a viewable one.
+ */
+export async function viewPassword(userId: string): Promise<{ password: string | null }> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { passwordEnc: true } });
+  if (!user) {
+    throw new AdminUserServiceError("NOT_FOUND", "User not found.");
+  }
+  return { password: decryptPassword(user.passwordEnc) };
 }

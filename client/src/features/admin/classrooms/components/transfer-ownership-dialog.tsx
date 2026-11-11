@@ -73,7 +73,7 @@ export function TransferOwnershipDialog({
               type="email"
               required
               autoFocus
-              placeholder="teacher@gcr.dev"
+              placeholder="teacher@eithm.edu.pk"
             />
             {fieldErrors?.newOwnerEmail ? (
               <p className="text-xs text-destructive">{fieldErrors.newOwnerEmail[0]}</p>

@@ -78,3 +78,8 @@ export function forcePasswordChangeAction(userId: string) {
     "Couldn't force a password change for this user. Please try again.",
   );
 }
+
+/** A user's current password (the admin-viewable copy); null when none is stored. */
+export function viewPasswordAction(userId: string): Promise<{ password: string | null }> {
+  return apiGet<{ password: string | null }>(`/admin/users/${userId}/password`);
+}

@@ -121,6 +121,11 @@ adminRouter.post("/users/:userId/reset-password", async (req, res) => {
   res.json({ status: "success", data: result });
 });
 
+adminRouter.get("/users/:userId/password", async (req, res) => {
+  // Never cached: it is read on demand, one user at a time.
+  res.json({ status: "success", data: await userService.viewPassword(userIdOf(req)) });
+});
+
 adminRouter.post("/users/:userId/force-password-change", async (req, res) => {
   const userId = userIdOf(req);
   await userService.forcePasswordChange(userId, currentUser(req));

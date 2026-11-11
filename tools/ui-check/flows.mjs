@@ -11,9 +11,9 @@ import { chromium } from "playwright";
 const BASE_URL = process.env.BASE_URL ?? "http://client:5173";
 
 const ACCOUNTS = {
-  admin: { email: "faizan.admin@gcr.dev", password: "F@izan4121" },
-  teacher: { email: "daniel.teacher@gcr.dev", password: "Testpass123!" },
-  student: { email: "sofia.student@gcr.dev", password: "Testpass123!" },
+  admin: { email: "admin@eithm.edu.pk", password: "Admin@12345" },
+  teacher: { email: "ayesha.khan@eithm.edu.pk", password: "Teacher@123" },
+  student: { email: "ali.raza@eithm.edu.pk", password: "Student@123" },
 };
 
 async function signIn(browser, role, viewport = { width: 1440, height: 900 }) {
@@ -392,7 +392,7 @@ FLOWS.avatar = async function avatar(browser) {
 
 FLOWS.adminUsers = async function adminUsers(browser) {
   const stamp = Date.now();
-  const email = `flow.${stamp}@gcr.dev`;
+  const email = `flow.${stamp}@eithm.edu.pk`;
   const name = `Flow User ${stamp}`;
   const admin = await signIn(browser, "admin");
   await admin.page.goto(`${BASE_URL}/admin/users`);

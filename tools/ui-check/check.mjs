@@ -18,9 +18,9 @@ import { chromium } from "playwright";
 const BASE_URL = process.env.BASE_URL ?? "http://client:5173";
 
 const ACCOUNTS = {
-  admin: { email: "faizan.admin@gcr.dev", password: "F@izan4121" },
-  teacher: { email: "daniel.teacher@gcr.dev", password: "Testpass123!" },
-  student: { email: "sofia.student@gcr.dev", password: "Testpass123!" },
+  admin: { email: "admin@eithm.edu.pk", password: "Admin@12345" },
+  teacher: { email: "ayesha.khan@eithm.edu.pk", password: "Teacher@123" },
+  student: { email: "ali.raza@eithm.edu.pk", password: "Student@123" },
 };
 
 // "{classroomId}" / "{assignmentId}" are replaced with the seeded shared class and its first assignment.

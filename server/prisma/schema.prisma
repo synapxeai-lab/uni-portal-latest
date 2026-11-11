@@ -181,6 +181,9 @@ model User {
   // Unsplash URLs) or when no avatar has been uploaded, in which case
   // avatarUrl is rendered/used exactly as stored, same as always.
   avatarStorageKey    String?
+  // AES-256-GCM copy of the current password so admins can look it up
+  // (lib/auth/password-vault.ts). Sign-in only ever checks passwordHash.
+  passwordEnc         String?
   archivedAt          DateTime?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
@@ -208,6 +211,8 @@ model User {
   timetableSlots           TimetableSlot[]       @relation("TimetableSlotTeacher")
   timetableClashRequests   TimetableClash[]      @relation("TimetableClashRequester")
   resolvedTimetableClashes TimetableClash[]      @relation("TimetableClashResolver")
+  teacherProfile           Teacher?
+  studentProfile           Student?
 
   @@index([role])
   @@index([status])
@@ -297,20 +302,25 @@ model VerificationToken {
 }
 
 model Classroom {
-  id            String          @id @default(uuid()) @db.Uuid
-  ownerId       String          @db.Uuid
-  title         String
-  subject       String?
-  section       String
-  description   String?
-  room          String?
-  code          String          @unique
-  coverImageUrl String?
-  status        ClassroomStatus @default(ACTIVE)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  deletedAt     DateTime?
+  id              String          @id @default(uuid()) @db.Uuid
+  ownerId         String          @db.Uuid
+  title           String
+  subject         String?
+  section         String
+  description     String?
+  room            String?
+  code            String          @unique
+  coverImageUrl   String?
+  status          ClassroomStatus @default(ACTIVE)
+  // Set for the classroom of a course offered to a section; its roster then
+  // follows the offering's teacher and the students registered for it.
+  // Null for stand-alone classrooms a teacher creates by hand.
+  sectionCourseId Int?            @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
 
+  sectionCourse    SectionCourse?        @relation(fields: [sectionCourseId], references: [id], onDelete: SetNull)
   owner            User                  @relation("ClassroomOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   settings         ClassroomSettings?
   memberships      ClassroomMembership[]
@@ -745,4 +755,391 @@ model SystemSettings {
   updatedById              String?  @db.Uuid
 
   updatedBy User? @relation("SystemSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Academic administration (from the University Portal)
+//
+// Programmes group diplomas (Department); a diploma has courses and, per
+// batch, sections. A course offered to a section (SectionCourse) is taught by
+// one teacher and has its own Classroom for stream, classwork and submissions.
+// Students register for offered courses each registration period
+// (Enrollment); attendance, marks and grades hang off the enrollment.
+//
+// Academic ids stay integers (they appear in admin URLs); accounts are the
+// uuid User rows above. Teacher and Student are profiles linked to a login.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// A main programme (e.g. Culinary, CPD) that groups diplomas. Departments,
+// teachers and students refer to it by `key`, which never changes once made.
+model ProgrammeCategory {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  slug        String   @unique // used in page URLs
+  label       String   @unique
+  description String
+  icon        String   @default("layers")
+  color       String
+  bg          String
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// A diploma. Its position in its programme (`semester`) is the semester in
+// which a batch studies it.
+model Department {
+  id            Int       @id @default(autoincrement())
+  name          String    @unique
+  code          String    @unique
+  color         String
+  bg            String
+  description   String
+  head          String
+  category      String    @default("CPD") // ProgrammeCategory.key
+  semester      Int       @default(1)
+  // Percent (0-100) off the diploma's fee when a student takes all its courses.
+  discountRate  Float     @default(0)
+  studentsCount Int       @default(0)
+  courses       Course[]
+  sections      Section[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([category, semester])
+}
+
+model Course {
+  id                   Int                  @id @default(autoincrement())
+  // Unique per diploma, not globally: the same course can be added to several
+  // diplomas, each getting its own copy with the same code.
+  code                 String
+  name                 String
+  creditHours          Int
+  fee                  Int                  @default(0) // Rs.
+  discountRate         Float                @default(0)
+  theoryPercent        Int                  @default(100)
+  extraFees            CourseFee[]
+  assessmentScheme     CourseAssessment[]
+  departmentId         Int
+  department           Department           @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  sectionLinks         SectionCourse[]
+  plannedTeachers      PlannedAssignment[]
+  enrollments          Enrollment[]
+  assessmentCategories AssessmentCategory[]
+  gradingCriteria      GradingCriteria[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@unique([departmentId, code])
+}
+
+// One extra charge on a course, e.g. "Uniform Fee", Rs. 3,000.
+model CourseFee {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  name      String
+  amount    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([courseId])
+}
+
+// Batches added by an admin on top of the fixed yearly intakes. A yearly batch
+// the admin deleted is kept with `removed` set so it isn't regenerated.
+model Batch {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  year      Int?
+  removed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// A diploma's cohort for one batch (e.g. "Section A"), shared by every course
+// of that diploma.
+model Section {
+  id                   Int                  @id @default(autoincrement())
+  label                String
+  batch                String
+  departmentId         Int
+  department           Department           @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  students             Student[]
+  courseLinks          SectionCourse[]
+  plannedTeachers      PlannedAssignment[]
+  enrollments          Enrollment[]
+  assessmentCategories AssessmentCategory[]
+  gradingCriteria      GradingCriteria[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@unique([departmentId, batch, label])
+  @@index([batch])
+}
+
+// A course offered to a section, with the teacher who teaches it. Its
+// classroom carries the stream, classwork and submissions for that class.
+model SectionCourse {
+  id        Int        @id @default(autoincrement())
+  sectionId Int
+  section   Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  courseId  Int
+  course    Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacherId Int?
+  teacher   Teacher?   @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  classroom Classroom?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([sectionId, courseId])
+  @@index([courseId])
+  @@index([teacherId])
+}
+
+// A teacher chosen for a course's section before the course is offered to it.
+model PlannedAssignment {
+  id        Int      @id @default(autoincrement())
+  sectionId Int
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  courseId  Int
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacherId Int
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sectionId, courseId])
+  @@index([teacherId])
+}
+
+model Teacher {
+  id                 Int                 @id @default(autoincrement())
+  // The teacher's login. Null only while an account hasn't been created yet.
+  userId             String?             @unique @db.Uuid
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name               String
+  phone              String
+  email              String              @unique
+  address            String
+  cnic               String              @unique
+  qualification      String
+  programme          String              @default("CPD") // ProgrammeCategory.key
+  // PERMANENT teachers get a fixed salary; VISITING teachers are paid per credit hour taught.
+  type               String              @default("PERMANENT")
+  salary             Int?
+  ratePerCreditHour  Int?
+  guardianName       String
+  guardianContact    String
+  guardianCnic       String
+  sectionCourses     SectionCourse[]
+  plannedAssignments PlannedAssignment[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([programme])
+}
+
+model Student {
+  id                   Int          @id @default(autoincrement())
+  userId               String?      @unique @db.Uuid
+  user                 User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name                 String
+  rollNo               String       @unique
+  email                String       @unique
+  phone                String
+  address              String
+  cnic                 String       @unique
+  dob                  DateTime?
+  gender               String? // MALE | FEMALE | OTHER
+  lastQualification    String?
+  passingYear          Int?
+  grade                String?
+  university           String?
+  programme            String       @default("CPD") // ProgrammeCategory.key
+  batch                String
+  section              String
+  enrolledSections     Section[]
+  enrollments          Enrollment[]
+  challans             Challan[]
+  guardianName         String
+  guardianContact      String
+  guardianCnic         String
+  guardianRelationship String?
+  guardianEmail        String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([programme, batch])
+}
+
+// A registration period admins open for students to enroll in one semester.
+model Registration {
+  id              Int                 @id @default(autoincrement())
+  semester        String // SPRING | SUMMER | FALL
+  year            Int
+  startDate       DateTime
+  endDate         DateTime
+  closedAt        DateTime?
+  semesterStart   DateTime?
+  semesterEnd     DateTime?
+  semesterEndedAt DateTime?
+  enrollments     Enrollment[]
+  limits          RegistrationLimit[]
+  challans        Challan[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([semester, year])
+  @@index([startDate, endDate])
+}
+
+// Per-batch override of the default credit cap for one registration period.
+model RegistrationLimit {
+  id             Int          @id @default(autoincrement())
+  registrationId Int
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  batch          String
+  creditLimit    Int
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([registrationId, batch])
+}
+
+// A student's registration for one course in one section during one period.
+model Enrollment {
+  id                 Int          @id @default(autoincrement())
+  studentId          Int
+  student            Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  registrationId     Int
+  registration       Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  courseId           Int
+  course             Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sectionId          Int
+  section            Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  attendance         Attendance[]
+  marks              Mark[]
+  percentageOverride Float?
+  gradeOverride      String?
+  publishedGrade     String?
+  gradeVisibleFrom   DateTime?
+  gradeGeneratedAt   DateTime?
+  createdAt          DateTime     @default(now())
+
+  @@unique([studentId, registrationId, courseId])
+  @@index([courseId, sectionId])
+  @@index([sectionId])
+  @@index([registrationId])
+}
+
+// One row per student per class-day.
+model Attendance {
+  id           Int        @id @default(autoincrement())
+  enrollmentId Int
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  date         DateTime
+  status       String // PRESENT | LATE | ABSENT
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([enrollmentId, date])
+  @@index([date])
+}
+
+// One assessment section in a course's scheme (e.g. Quizzes, theory, 10%).
+model CourseAssessment {
+  id         Int                  @id @default(autoincrement())
+  courseId   Int
+  course     Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  type       String
+  component  String // THEORY | PRACTICAL
+  weightage  Float
+  categories AssessmentCategory[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@unique([courseId, type])
+}
+
+// A marks category for one course in one section, created from the scheme.
+model AssessmentCategory {
+  id                 Int               @id @default(autoincrement())
+  courseId           Int
+  course             Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sectionId          Int
+  section            Section           @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  courseAssessmentId Int?
+  courseAssessment   CourseAssessment? @relation(fields: [courseAssessmentId], references: [id], onDelete: Cascade)
+  type               String
+  weightage          Float?
+  assessments        Assessment[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([courseId, sectionId, type])
+  @@index([sectionId])
+  @@index([courseAssessmentId])
+}
+
+// One gradable item inside a category, e.g. "Quiz 1" out of 10.
+model Assessment {
+  id         Int                @id @default(autoincrement())
+  categoryId Int
+  category   AssessmentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title      String
+  totalMarks Float
+  marks      Mark[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([categoryId, title])
+}
+
+// Letter-grade percentage ranges for one course in one section.
+model GradingCriteria {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sectionId Int
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  grades    Json // [{ grade, min, max }], highest grade first
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([courseId, sectionId])
+  @@index([sectionId])
+}
+
+// A student's marks in one assessment.
+model Mark {
+  id           Int        @id @default(autoincrement())
+  assessmentId Int
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  enrollmentId Int
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  obtained     Float
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([assessmentId, enrollmentId])
+  @@index([enrollmentId])
+}
+
+// One fee challan per student per registration period. The student marks it
+// paid, which sends it to an admin for approval.
+model Challan {
+  id             Int          @id @default(autoincrement())
+  studentId      Int
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  registrationId Int
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  amount         Int
+  accountNumber  String
+  status         String       @default("UNPAID") // UNPAID | PENDING_APPROVAL | PAID
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([studentId, registrationId])
+  @@index([registrationId, status])
 }

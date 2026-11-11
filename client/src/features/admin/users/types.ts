@@ -11,6 +11,7 @@ export interface AdminUserSummary {
   status: UserStatus;
   mustChangePassword: boolean;
   image: string | null;
+  hasViewablePassword: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

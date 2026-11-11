@@ -16,6 +16,8 @@ interface TemporaryPasswordDialogProps {
   onOpenChange: (open: boolean) => void;
   userName: string;
   temporaryPassword: string;
+  /** "current" shows a user's existing password (View password) instead of a new temporary one. */
+  variant?: "temporary" | "current";
 }
 
 export function TemporaryPasswordDialog({
@@ -23,6 +25,7 @@ export function TemporaryPasswordDialog({
   onOpenChange,
   userName,
   temporaryPassword,
+  variant = "temporary",
 }: TemporaryPasswordDialogProps) {
   const { copy, copied } = useCopyToClipboard();
 
@@ -30,10 +33,11 @@ export function TemporaryPasswordDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Temporary password</DialogTitle>
+          <DialogTitle>{variant === "current" ? "Current password" : "Temporary password"}</DialogTitle>
           <DialogDescription>
-            Share this password with {userName}. It won&apos;t be shown again, and they&apos;ll be
-            required to set their own on first sign-in.
+            {variant === "current"
+              ? `${userName}'s current password. Share it only with them.`
+              : `Share this password with ${userName}. It won't be shown again, and they'll be required to set their own on first sign-in.`}
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/50 px-3 py-2.5 font-mono text-sm">
@@ -43,8 +47,8 @@ export function TemporaryPasswordDialog({
             variant="outline"
             size="icon"
             className="h-8 w-8 shrink-0"
-            onClick={() => copy(temporaryPassword, "Temporary password copied")}
-            aria-label="Copy temporary password"
+            onClick={() => copy(temporaryPassword, "Password copied")}
+            aria-label="Copy password"
           >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           </Button>

@@ -5,6 +5,7 @@ import {
   Ban,
   Eye,
   KeyRound,
+  LockKeyhole,
   MoreVertical,
   Pencil,
   RotateCcw,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserStatus } from "@portal/shared/enums";
 
-import { forcePasswordChangeAction, resetPasswordAction } from "../api";
+import { forcePasswordChangeAction, resetPasswordAction, viewPasswordAction } from "../api";
 import { EditUserDialog } from "./edit-user-dialog";
 import { TemporaryPasswordDialog } from "./temporary-password-dialog";
 import { UserDetailsSheet } from "./user-details-sheet";
@@ -54,6 +55,7 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [isPending, startTransition] = useTransition();
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState<string | null>(null);
 
   const isArchived = user.status === UserStatus.ARCHIVED;
 
@@ -64,6 +66,21 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
         setTemporaryPassword(result.data.temporaryPassword);
       } else {
         toast.error(result.message);
+      }
+    });
+  }
+
+  function handleViewPassword() {
+    startTransition(async () => {
+      try {
+        const { password } = await viewPasswordAction(user.id);
+        if (password) {
+          setCurrentPassword(password);
+        } else {
+          toast.error("This password was set before passwords became viewable. Reset it to get a viewable one.");
+        }
+      } catch {
+        toast.error("Couldn't load this user's password. Please try again.");
       }
     });
   }
@@ -117,6 +134,9 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
             <Pencil /> Edit user
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={handleViewPassword} disabled={!user.hasViewablePassword}>
+            <LockKeyhole /> View password
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={handleResetPassword} disabled={isSelf || isArchived}>
             <KeyRound /> Reset password
           </DropdownMenuItem>
@@ -243,6 +263,20 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
         pending={isPending}
         onConfirm={handleConfirm}
       />
+
+      {currentPassword ? (
+        <TemporaryPasswordDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setCurrentPassword(null);
+            }
+          }}
+          userName={user.name}
+          temporaryPassword={currentPassword}
+          variant="current"
+        />
+      ) : null}
 
       {temporaryPassword ? (
         <TemporaryPasswordDialog

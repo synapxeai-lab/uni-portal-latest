@@ -16,9 +16,9 @@ const ROUNDS = Number(process.env.LATENCY_ROUNDS ?? 10);
 const BUDGET_MS = Number(process.env.BUDGET_MS ?? 100);
 
 const ACCOUNTS = {
-  admin: { email: "faizan.admin@gcr.dev", password: "F@izan4121" },
-  teacher: { email: "daniel.teacher@gcr.dev", password: "Testpass123!" },
-  student: { email: "sofia.student@gcr.dev", password: "Testpass123!" },
+  admin: { email: "admin@eithm.edu.pk", password: "Admin@12345" },
+  teacher: { email: "ayesha.khan@eithm.edu.pk", password: "Teacher@123" },
+  student: { email: "ali.raza@eithm.edu.pk", password: "Student@123" },
 } as const;
 
 type Role = keyof typeof ACCOUNTS;

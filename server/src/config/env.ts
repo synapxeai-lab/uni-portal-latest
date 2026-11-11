@@ -8,6 +8,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   // HS256 signing secret for session JWTs. Must be long and random in production.
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters."),
+  // Encrypts the copy of each password admins can view (lib/auth/password-vault.ts).
+  // Falls back to JWT_SECRET. Use the University Portal's old key to keep its
+  // migrated passwords viewable.
+  PASSWORD_ENC_KEY: z.string().min(1).optional(),
   // Selects the StorageProvider implementation (see src/lib/storage).
   STORAGE_DRIVER: z.enum(["local"]).default("local"),
   // Absolute path for the "local" driver's files. Unset = <server>/storage/uploads.

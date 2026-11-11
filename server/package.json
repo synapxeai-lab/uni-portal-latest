@@ -12,7 +12,9 @@
     "prisma:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "seed": "prisma db seed",
-    "latency": "tsx scripts/latency.ts"
+    "latency": "tsx scripts/latency.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@portal/shared": "*",
@@ -38,6 +40,7 @@
     "@types/node": "^22.18.0",
     "esbuild": "^0.25.10",
     "tsx": "^4.20.6",
+    "vitest": "^3.2.4",
     "typescript": "^5.9.3"
   }
 }

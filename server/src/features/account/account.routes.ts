@@ -5,7 +5,7 @@ import { changePasswordSchema } from "@portal/shared/auth";
 import { badRequest, notFound } from "@/http/errors";
 import { multipart } from "@/http/upload";
 import { currentUser } from "@/middleware/auth";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { passwordFields, verifyPassword } from "@/lib/auth/password";
 import { invalidateAdmin, invalidateAllAcademic, invalidateUser } from "@/lib/cache/tags";
 import { deleteUserAvatar, uploadUserAvatar } from "@/lib/storage/avatar-service";
 import { extractUploadedFiles } from "@/lib/storage/extract-files";
@@ -105,13 +105,13 @@ accountRouter.post("/password", async (req, res) => {
     throw badRequest(FIX_FIELDS, { newPassword: violations });
   }
 
-  const passwordHash = await hashPassword(parsed.data.newPassword);
+  const passwordData = await passwordFields(parsed.data.newPassword);
 
   // Clears any admin-forced change and reactivates an account that was
   // pending one.
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash, mustChangePassword: false, status: UserStatus.ACTIVE },
+    data: { ...passwordData, mustChangePassword: false, status: UserStatus.ACTIVE },
   });
 
   invalidateUser(user.id);
