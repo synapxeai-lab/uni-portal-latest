@@ -172,7 +172,7 @@ export function SubmissionReviewPanel({
           title="Return this submission?"
           description={
             detail.submission?.grade !== null && detail.submission?.grade !== undefined
-              ? `${detail.student.name} will see their grade (${formatGrade(detail.submission.grade, maxPoints)}) and feedback. The grade will be locked.`
+              ? `${detail.student.name} will see their grade (${formatGrade(detail.submission.grade, maxPoints)}) and feedback. The grade is locked unless they revise and resubmit.`
               : `${detail.student.name} will see their work marked as returned. No grade has been entered.`
           }
           confirmLabel="Return"

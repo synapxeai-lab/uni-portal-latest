@@ -316,7 +316,7 @@ export function SubmissionPanel({
                   onClick={() => setUnsubmitConfirmOpen(true)}
                   disabled={unsubmit.isPending}
                 >
-                  {unsubmit.isPending ? "Unsubmitting…" : "Unsubmit"}
+                  {unsubmit.isPending ? "Unsubmitting…" : isReturned ? "Revise and resubmit" : "Unsubmit"}
                 </Button>
               ) : null}
             </>
@@ -340,13 +340,13 @@ export function SubmissionPanel({
         <ConfirmDialog
           open={unsubmitConfirmOpen}
           onOpenChange={setUnsubmitConfirmOpen}
-          title="Unsubmit this assignment?"
+          title={isReturned ? "Revise your returned work?" : "Unsubmit this assignment?"}
           description={
             isReturned
-              ? "Your work will go back to draft so you can revise it. Turn it in again when you're done - your teacher will review it again."
+              ? "Your work goes back to draft so you can improve it. Your grade is hidden until you turn it in again and your teacher returns it with a new grade."
               : "Your work will go back to draft so you can make changes. Remember to turn it in again before the due date."
           }
-          confirmLabel="Unsubmit"
+          confirmLabel={isReturned ? "Revise" : "Unsubmit"}
           pending={unsubmit.isPending}
           onConfirm={unsubmit.run}
         />
