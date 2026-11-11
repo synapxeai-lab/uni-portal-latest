@@ -1,0 +1,748 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_PASSWORD_CHANGE
+  ARCHIVED
+  // System-triggered (not admin-set) after too many consecutive failed
+  // logins - distinct from SUSPENDED, which is always an admin decision.
+  LOCKED
+}
+
+enum ClassroomMembershipRole {
+  OWNER
+  TEACHER
+  CO_TEACHER
+  STUDENT
+  ASSISTANT
+}
+
+enum ClassroomMembershipStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+  ARCHIVED
+}
+
+enum ClassroomStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum InvitationType {
+  EMAIL
+  LINK
+  CODE
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+}
+
+enum MaterialType {
+  DOCUMENT
+  LINK
+  VIDEO
+  IMAGE
+  OTHER
+}
+
+enum MaterialStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+}
+
+enum AssignmentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  CLOSED
+}
+
+enum SubmissionStatus {
+  ASSIGNED
+  SUBMITTED
+  LATE
+  REVIEWED
+  RETURNED
+  MISSING
+}
+
+enum CommentVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum NotificationType {
+  NEW_ASSIGNMENT
+  NEW_MATERIAL
+  NEW_ANNOUNCEMENT
+  SUBMISSION_RETURNED
+  PRIVATE_COMMENT
+  CLASS_COMMENT
+  GENERAL
+  CLASS_CREATED
+  CLASS_ARCHIVED
+  TIMESLOT_SCHEDULED
+  TIMESLOT_UPDATED
+  TIMESLOT_CANCELLED
+  TIMESLOT_CLASH
+  TIMESLOT_RESOLVED
+  TIMESLOT_CLASH_REPORTED
+}
+
+enum TimetableClashKind {
+  SECTION
+  ROOM
+}
+
+enum TimetableClashStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum FileAttachmentType {
+  ANNOUNCEMENT
+  MATERIAL
+  ASSIGNMENT
+  SUBMISSION
+}
+
+enum ActivityAction {
+  CREATED
+  UPDATED
+  DELETED
+  ARCHIVED
+  JOINED
+  INVITED
+  SUBMITTED
+  RETURNED
+  SUSPENDED
+  ROLE_CHANGED
+  PASSWORD_RESET
+  RESTORED
+  LOCKED
+  UNLOCKED
+  SESSION_TERMINATED
+}
+
+// Admin content-moderation state, orthogonal to a model's own authoring
+// status (e.g. Assignment.status DRAFT/PUBLISHED/CLOSED is the teacher's
+// workflow; moderationStatus is the platform admin's oversight state).
+enum ModerationStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+model User {
+  id                  String     @id @default(uuid()) @db.Uuid
+  name                String
+  email               String     @unique
+  passwordHash        String?
+  role                UserRole   @default(STUDENT)
+  status              UserStatus @default(ACTIVE)
+  mustChangePassword  Boolean    @default(false)
+  failedLoginAttempts Int        @default(0)
+  lockedAt            DateTime?
+  emailVerified       DateTime?
+  image               String?
+  avatarUrl           String?
+  // Internal storage key backing avatarUrl when it's a self-uploaded photo
+  // (avatarUrl is then set to the stable /api/avatars/{userId} route) -
+  // null for the pre-existing external avatarUrl values (e.g. seeded
+  // Unsplash URLs) or when no avatar has been uploaded, in which case
+  // avatarUrl is rendered/used exactly as stored, same as always.
+  avatarStorageKey    String?
+  archivedAt          DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  ownedClassrooms          Classroom[]           @relation("ClassroomOwner")
+  classroomMemberships     ClassroomMembership[]
+  invitedClassrooms        Invitation[]          @relation("InvitationInvitedBy")
+  invitedUsers             Invitation[]          @relation("InvitationInviteeUser")
+  authoredAnnouncements    Announcement[]        @relation("AnnouncementAuthor")
+  authoredMaterials        Material[]            @relation("MaterialAuthor")
+  authoredAssignments      Assignment[]          @relation("AssignmentAuthor")
+  submissions              Submission[]          @relation("SubmissionStudent")
+  authoredComments         Comment[]             @relation("CommentAuthor")
+  notifications            Notification[]        @relation("NotificationRecipient")
+  uploadedFiles            File[]                @relation("FileUploader")
+  activityLogs             ActivityLog[]         @relation("ActivityActor")
+  accounts                 Account[]
+  sessions                 Session[]
+  updatedSystemSettings    SystemSettings[]      @relation("SystemSettingsUpdatedBy")
+  loginAttempts            LoginAttempt[]
+  loginSessions            UserLoginSession[]
+  publishedAnnouncements   Announcement[]        @relation("AnnouncementPublishedBy")
+  publishedMaterials       Material[]            @relation("MaterialPublishedBy")
+  publishedAssignments     Assignment[]          @relation("AssignmentPublishedBy")
+  timetableSlots           TimetableSlot[]       @relation("TimetableSlotTeacher")
+  timetableClashRequests   TimetableClash[]      @relation("TimetableClashRequester")
+  resolvedTimetableClashes TimetableClash[]      @relation("TimetableClashResolver")
+
+  @@index([role])
+  @@index([status])
+}
+
+// One row per failed (or successful) credentials attempt - drives the
+// "Failed Login Attempts" admin view and the auto-lockout counter on User.
+model LoginAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String
+  userId    String?  @db.Uuid
+  succeeded Boolean
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, createdAt])
+  @@index([userId, createdAt])
+  @@index([succeeded, createdAt])
+}
+
+// Tracks individual signed-in sessions (one per login) so a specific session
+// can be listed and revoked - the adapter-scaffolded Session model above is
+// unused, since this app runs JWT-strategy auth with no server-side session
+// record by default. tokenId matches the JWT's "jti" claim; proxy.ts checks
+// revokedAt/expiresAt on every request to enforce termination.
+model UserLoginSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenId    String    @unique
+  userAgent  String?
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([revokedAt, expiresAt])
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String   @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Classroom {
+  id            String          @id @default(uuid()) @db.Uuid
+  ownerId       String          @db.Uuid
+  title         String
+  subject       String?
+  section       String
+  description   String?
+  room          String?
+  code          String          @unique
+  coverImageUrl String?
+  status        ClassroomStatus @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+
+  owner            User                  @relation("ClassroomOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  settings         ClassroomSettings?
+  memberships      ClassroomMembership[]
+  invitations      Invitation[]
+  topics           Topic[]
+  announcements    Announcement[]
+  materials        Material[]
+  assignments      Assignment[]
+  activityLogs     ActivityLog[]
+  timetableSlots   TimetableSlot[]
+  timetableClashes TimetableClash[]
+  notifications    Notification[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ClassroomSettings {
+  id               String   @id @default(uuid()) @db.Uuid
+  classroomId      String   @unique @db.Uuid
+  allowComments    Boolean  @default(true)
+  allowMaterials   Boolean  @default(true)
+  allowAssignments Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // One classroom has one settings row, which keeps configuration separate from core content.
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+}
+
+model ClassroomMembership {
+  id          String                    @id @default(uuid()) @db.Uuid
+  classroomId String                    @db.Uuid
+  userId      String                    @db.Uuid
+  role        ClassroomMembershipRole   @default(STUDENT)
+  status      ClassroomMembershipStatus @default(ACTIVE)
+  joinedAt    DateTime                  @default(now())
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  // Membership is the canonical join table for users participating in a classroom.
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([classroomId, userId])
+  @@index([userId])
+  @@index([classroomId, status])
+}
+
+model Invitation {
+  id            String           @id @default(uuid()) @db.Uuid
+  classroomId   String           @db.Uuid
+  invitedById   String           @db.Uuid
+  inviteeUserId String?          @db.Uuid
+  inviteeEmail  String
+  type          InvitationType   @default(EMAIL)
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  // Invitations are separate from memberships so pending access can be tracked without changing membership state.
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: Restrict)
+  inviteeUser User?     @relation("InvitationInviteeUser", fields: [inviteeUserId], references: [id], onDelete: SetNull)
+
+  @@index([classroomId, status])
+  @@index([classroomId, inviteeEmail])
+  @@index([inviteeUserId])
+}
+
+model Topic {
+  id          String    @id @default(uuid()) @db.Uuid
+  classroomId String    @db.Uuid
+  title       String
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  classroom   Classroom    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  materials   Material[]
+  assignments Assignment[]
+
+  @@index([classroomId, position])
+}
+
+model Announcement {
+  id               String             @id @default(uuid()) @db.Uuid
+  classroomId      String             @db.Uuid
+  authorId         String             @db.Uuid
+  title            String
+  content          String             @db.Text
+  status           AnnouncementStatus @default(PUBLISHED)
+  moderationStatus ModerationStatus   @default(ACTIVE)
+  isPinned         Boolean            @default(false)
+  // Scheduling (Phase 14.1): scheduledFor is set only while status is
+  // SCHEDULED; publishedAt/publishedById record how the content actually
+  // became visible (immediate publish, a scheduled publish, or "publish now").
+  scheduledFor     DateTime?
+  publishedAt      DateTime?
+  publishedById    String?            @db.Uuid
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+
+  // Announcements are classroom-level posts and can have comments and attachments.
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  author      User      @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  publishedBy User?     @relation("AnnouncementPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  comments    Comment[] @relation("AnnouncementComments")
+
+  @@index([status, scheduledFor])
+  @@index([moderationStatus, createdAt])
+  @@index([classroomId, createdAt])
+  @@index([authorId])
+}
+
+model Material {
+  id               String           @id @default(uuid()) @db.Uuid
+  classroomId      String           @db.Uuid
+  topicId          String?          @db.Uuid
+  authorId         String           @db.Uuid
+  title            String
+  description      String?          @db.Text
+  url              String?
+  type             MaterialType     @default(DOCUMENT)
+  status           MaterialStatus   @default(PUBLISHED)
+  moderationStatus ModerationStatus @default(ACTIVE)
+  // Scheduling (Phase 14.1) - see Announcement.scheduledFor for field semantics.
+  scheduledFor     DateTime?
+  publishedAt      DateTime?
+  publishedById    String?          @db.Uuid
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+
+  // Materials can optionally belong to a topic to improve classroom organization.
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  topic       Topic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  author      User      @relation("MaterialAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  publishedBy User?     @relation("MaterialPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+
+  @@index([classroomId, createdAt])
+  @@index([topicId])
+  @@index([authorId])
+  @@index([status, scheduledFor])
+  @@index([moderationStatus, createdAt])
+}
+
+model Assignment {
+  id                  String           @id @default(uuid()) @db.Uuid
+  classroomId         String           @db.Uuid
+  topicId             String?          @db.Uuid
+  authorId            String           @db.Uuid
+  title               String
+  description         String?          @db.Text
+  status              AssignmentStatus @default(DRAFT)
+  moderationStatus    ModerationStatus @default(ACTIVE)
+  dueDate             DateTime?
+  points              Int?
+  allowLateSubmission Boolean          @default(true)
+  // Scheduling (Phase 14.1) - see Announcement.scheduledFor for field semantics.
+  scheduledFor        DateTime?
+  publishedAt         DateTime?
+  publishedById       String?          @db.Uuid
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  deletedAt           DateTime?
+
+  // Assignments are the main work submission container and should remain separate from materials.
+  classroom   Classroom    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  topic       Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  author      User         @relation("AssignmentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  publishedBy User?        @relation("AssignmentPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  submissions Submission[]
+
+  @@index([classroomId, dueDate])
+  @@index([topicId])
+  @@index([authorId])
+  @@index([status, scheduledFor])
+  @@index([moderationStatus, createdAt])
+}
+
+model Submission {
+  id             String           @id @default(uuid()) @db.Uuid
+  assignmentId   String           @db.Uuid
+  studentId      String           @db.Uuid
+  textAnswer     String?          @db.Text
+  submittedAt    DateTime?
+  returnedAt     DateTime?
+  status         SubmissionStatus @default(ASSIGNED)
+  privateComment String?          @db.Text
+  // Grading (Phase 9.3): grade is bounded by Assignment.points at the service
+  // layer, not the schema - Prisma has no cross-column check constraints.
+  grade          Int?
+  feedback       String?          @db.Text
+  gradedAt       DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+
+  // One student submission per assignment is enforced to keep grading workflows simple and consistent.
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    User       @relation("SubmissionStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  comments   Comment[]  @relation("SubmissionComments")
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId])
+  @@index([assignmentId, status])
+}
+
+model Comment {
+  id               String            @id @default(uuid()) @db.Uuid
+  authorId         String            @db.Uuid
+  announcementId   String?           @db.Uuid
+  submissionId     String?           @db.Uuid
+  content          String            @db.Text
+  visibility       CommentVisibility @default(PUBLIC)
+  moderationStatus ModerationStatus  @default(ACTIVE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+
+  // Comments are intentionally flexible and may belong to either an announcement or a submission.
+  author       User          @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  announcement Announcement? @relation("AnnouncementComments", fields: [announcementId], references: [id], onDelete: Cascade)
+  submission   Submission?   @relation("SubmissionComments", fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([announcementId, createdAt])
+  @@index([submissionId, createdAt])
+  @@index([authorId])
+  @@index([moderationStatus, createdAt])
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  recipientId String           @db.Uuid
+  type        NotificationType
+  title       String
+  message     String           @db.Text
+  // Where clicking the notification should navigate to (e.g. an assignment or
+  // classroom roster page) - computed once at creation time by the notification
+  // generator, since it already has the relevant ids in scope.
+  link        String?
+  // Set for notifications about one classroom's stream (new announcement,
+  // class comment) so they can be marked read as soon as the recipient is
+  // looking at that stream - see markStreamNotificationsRead.
+  classroomId String?          @db.Uuid
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  recipient User       @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt])
+  @@index([recipientId, classroomId, isRead])
+}
+
+model File {
+  id              String    @id @default(uuid()) @db.Uuid
+  storagePath     String
+  // Which StorageProvider wrote this file ("local" today; "s3"/"r2"/"supabase"/
+  // "azure-blob"/"gcs" once a cloud provider is added) - lets a mixed fleet of
+  // old and newly-migrated records coexist during a future storage migration,
+  // since the provider that can actually read a given storagePath depends on it.
+  storageProvider String    @default("local")
+  fileName        String
+  mimeType        String
+  size            Int
+  uploadedById    String    @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // File metadata is stored in the database while the actual binary content lives in external storage.
+  uploadedBy  User             @relation("FileUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  attachments FileAttachment[]
+
+  @@unique([storagePath])
+  @@index([uploadedById, createdAt])
+}
+
+model FileAttachment {
+  id             String             @id @default(uuid()) @db.Uuid
+  fileId         String             @db.Uuid
+  attachmentType FileAttachmentType
+  entityId       String             @db.Uuid
+  createdAt      DateTime           @default(now())
+
+  // This polymorphic attachment table keeps the schema normalized and avoids duplicating file tables for each domain entity.
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, attachmentType, entityId])
+  @@index([fileId, attachmentType])
+  @@index([attachmentType, entityId])
+}
+
+model ActivityLog {
+  id          String         @id @default(uuid()) @db.Uuid
+  actorId     String         @db.Uuid
+  classroomId String?        @db.Uuid
+  entityType  String
+  entityId    String         @db.Uuid
+  action      ActivityAction
+  // Human-readable snapshot of the target at the time of the event (e.g. a
+  // user's "Name (email)" or an assignment's title) - audit trails should
+  // reflect the state as it happened, not a live join that can go stale or
+  // break once the target itself is renamed or soft-deleted.
+  targetLabel String?
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+
+  // Activity logs provide a lightweight audit trail and future analytics backbone without coupling every UI flow to the same tables.
+  actor     User       @relation("ActivityActor", fields: [actorId], references: [id], onDelete: Restrict)
+  classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([classroomId, createdAt])
+  @@index([entityType, entityId])
+  @@index([entityType, action, createdAt])
+}
+
+// Registered teaching rooms. A room number is exactly three digits: the first is
+// the floor, the last two the room on that floor (204 = floor 2, room 04).
+// Timetable slots must use an active room from this list.
+model Room {
+  id        String   @id @default(uuid()) @db.Uuid
+  number    String   @unique
+  floor     Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, number])
+}
+
+// One entry of the weekly timetable template: a classroom (course + section)
+// taught every week on `dayOfWeek` (1 = Monday .. 6 = Saturday) starting at
+// `startHour` (8..16, i.e. one-hour slots 08:00-17:00). Not tied to dates - the
+// same timetable repeats every week until a teacher changes it. sectionKey is the classroom's section, trimmed and lowercased -
+// the unique constraint on (sectionKey, dayOfWeek, startHour) is what guarantees a
+// section never has two classes at the same time, even under concurrent bookings.
+// roomKey (room, trimmed + lowercased) works the same way: one class per room per slot.
+// The (teacherId, dayOfWeek, startHour) constraint likewise stops a teacher from
+// being scheduled in two places at once.
+model TimetableSlot {
+  id          String   @id @default(uuid()) @db.Uuid
+  classroomId String   @db.Uuid
+  teacherId   String   @db.Uuid
+  sectionKey  String
+  room        String
+  roomKey     String
+  dayOfWeek   Int
+  startHour   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  classroom       Classroom        @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  teacher         User             @relation("TimetableSlotTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  clashes         TimetableClash[] @relation("TimetableClashConflictingSlot")
+  moveRequests    TimetableClash[] @relation("TimetableClashRescheduleSlot")
+  resolvedClashes TimetableClash[] @relation("TimetableClashResolvedSlot")
+
+  @@unique([sectionKey, dayOfWeek, startHour])
+  @@unique([teacherId, dayOfWeek, startHour])
+  @@unique([roomKey, dayOfWeek, startHour])
+  @@index([classroomId, dayOfWeek])
+  @@index([dayOfWeek])
+}
+
+// A booking attempt that was refused because the section already had a class in
+// the requested slot. Kept so an admin can review it and move the blocked class
+// to a free slot (resolvedSlot) - the existing booking is never touched.
+model TimetableClash {
+  id                String               @id @default(uuid()) @db.Uuid
+  classroomId       String               @db.Uuid
+  requestedById     String               @db.Uuid
+  conflictingSlotId String?              @db.Uuid
+  sectionKey        String
+  room              String
+  kind              TimetableClashKind   @default(SECTION)
+  dayOfWeek         Int
+  startHour         Int
+  status            TimetableClashStatus @default(PENDING)
+  resolvedById      String?              @db.Uuid
+  resolvedSlotId    String?              @db.Uuid
+  /// Set when the clash came from rescheduling an existing booking: resolving moves
+  /// this slot; dismissing leaves it where it is.
+  rescheduleSlotId  String?              @db.Uuid
+  resolvedAt        DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  classroom       Classroom      @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  requestedBy     User           @relation("TimetableClashRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  resolvedBy      User?          @relation("TimetableClashResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  conflictingSlot TimetableSlot? @relation("TimetableClashConflictingSlot", fields: [conflictingSlotId], references: [id], onDelete: SetNull)
+  resolvedSlot    TimetableSlot? @relation("TimetableClashResolvedSlot", fields: [resolvedSlotId], references: [id], onDelete: SetNull)
+  rescheduleSlot  TimetableSlot? @relation("TimetableClashRescheduleSlot", fields: [rescheduleSlotId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([classroomId, status])
+  @@index([rescheduleSlotId, status])
+}
+
+// Platform-wide configuration. Always exactly one row - enforced by the
+// service layer, which always reads/writes a fixed, well-known id rather than
+// letting a second settings row ever be created.
+model SystemSettings {
+  id                       String   @id @db.Uuid
+  platformName             String   @default("Elevate Institute of Tourism & Hospitality Management")
+  academicYear             String   @default("2025-2026")
+  sessionTimeoutMinutes    Int      @default(60)
+  maxUploadSizeMb          Int      @default(25)
+  defaultAllowComments     Boolean  @default(true)
+  defaultAllowMaterials    Boolean  @default(true)
+  defaultAllowAssignments  Boolean  @default(true)
+  notifyNewAssignment      Boolean  @default(true)
+  notifyNewMaterial        Boolean  @default(true)
+  notifyNewAnnouncement    Boolean  @default(true)
+  notifySubmissionReturned Boolean  @default(true)
+  notifyPrivateComment     Boolean  @default(true)
+  minPasswordLength        Int      @default(8)
+  requirePasswordUppercase Boolean  @default(true)
+  requirePasswordNumber    Boolean  @default(true)
+  requirePasswordSymbol    Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+  updatedById              String?  @db.Uuid
+
+  updatedBy User? @relation("SystemSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}

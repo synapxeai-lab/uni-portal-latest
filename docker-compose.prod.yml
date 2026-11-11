@@ -1,0 +1,45 @@
+# Production-style stack: Postgres + the single app image (API + built React
+# app). Useful to try a production build locally:
+#
+#   JWT_SECRET=$(openssl rand -hex 32) docker compose -f docker-compose.prod.yml up --build -d
+#   -> http://localhost:8080
+#
+# For a real deployment, put it behind HTTPS and drop COOKIE_SECURE (it then
+# defaults to secure cookies).
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portal
+      POSTGRES_USER: portal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portal_password}
+    volumes:
+      - prod_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal -d portal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    image: portal-app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://portal:${POSTGRES_PASSWORD:-portal_password}@db:5432/portal?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a long random string}
+      # Plain http on localhost only - see the note above.
+      COOKIE_SECURE: "false"
+    ports:
+      - "8080:4000"
+    volumes:
+      - prod_uploads:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  prod_postgres_data:
+  prod_uploads:

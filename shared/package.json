@@ -1,0 +1,13 @@
+{
+  "name": "@portal/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Validation schemas, enums and API contract types shared by server and client. Consumed as TypeScript source (no build step).",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

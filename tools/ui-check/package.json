@@ -1,0 +1,9 @@
+{
+  "name": "portal-ui-check",
+  "private": true,
+  "type": "module",
+  "description": "Headless-browser checks: responsive screenshots, console errors, and no-requests-on-hover. Run with: docker compose run --rm ui-check",
+  "dependencies": {
+    "playwright": "1.56.0"
+  }
+}

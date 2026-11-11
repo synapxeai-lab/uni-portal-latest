@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#171F32" />
+    <meta
+      name="description"
+      content="Elevate Institute of Tourism &amp; Hospitality Management - classroom management platform"
+    />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <title>Elevate Institute of Tourism &amp; Hospitality Management</title>
+    <!-- Applies the saved light/dark theme before first paint (no flash). Keep in sync with src/lib/theme.ts. -->
+    <script>
+      (function () {
+        var k = "theme",
+          d = document.documentElement,
+          m = window.matchMedia("(prefers-color-scheme: dark)");
+        function p() {
+          try {
+            var t = localStorage.getItem(k);
+            return t === "light" || t === "dark" ? t : "system";
+          } catch (e) {
+            return "system";
+          }
+        }
+        function a() {
+          var t = p();
+          d.setAttribute("data-theme", t === "system" ? (m.matches ? "dark" : "light") : t);
+        }
+        a();
+        m.addEventListener("change", a);
+      })();
+    </script>
+  </head>
+  <body class="min-h-full flex flex-col">
+    <div id="root" class="flex min-h-full flex-1 flex-col"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

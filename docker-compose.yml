@@ -1,0 +1,109 @@
+# EITHM University Portal - local development stack. No Node.js needed on the host.
+#
+#   docker compose up --build        # db + api + web, http://localhost:5180
+#   docker compose run --rm server npm run seed     # seed demo data
+#   docker compose run --rm server npm run latency  # API latency report
+#
+# `deps` runs `npm install` once into the shared node_modules volume, then
+# exits; `server` and `client` wait for it so they never race each other.
+
+x-node: &node
+  build:
+    context: .
+    dockerfile: docker/node-dev.Dockerfile
+  image: portal-node-dev
+  working_dir: /app
+  volumes:
+    - .:/app
+    - node_modules:/app/node_modules
+    - server_node_modules:/app/server/node_modules
+    - client_node_modules:/app/client/node_modules
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: portal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portal_dev
+      POSTGRES_USER: portal
+      POSTGRES_PASSWORD: portal_password
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal -d portal_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  deps:
+    <<: *node
+    command: sh -c "npm install --no-audit --no-fund && npm run prisma:generate --workspace server"
+
+  server:
+    <<: *node
+    working_dir: /app/server
+    restart: unless-stopped
+    command: sh -c "npx prisma migrate deploy && npm run dev"
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      DATABASE_URL: postgresql://portal:portal_password@postgres:5432/portal_dev?schema=public
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-in-production-0123456789}
+      STORAGE_ROOT: /app/server/storage/uploads
+      # Windows/macOS bind mounts don't forward file events - poll for changes.
+      CHOKIDAR_USEPOLLING: "true"
+      # Poll once a second - frequent polling of a bind mount costs real CPU.
+      CHOKIDAR_INTERVAL: "1000"
+    ports:
+      - "4040:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      deps:
+        condition: service_completed_successfully
+
+  client:
+    <<: *node
+    working_dir: /app/client
+    restart: unless-stopped
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    environment:
+      API_PROXY_TARGET: http://server:4000
+      # Windows/macOS bind mounts don't forward inotify events into the VM -
+      # vite.config.ts polls the source tree (only) when this is set.
+      VITE_POLL_WATCH: "true"
+    ports:
+      - "5180:5173"
+    depends_on:
+      deps:
+        condition: service_completed_successfully
+      server:
+        condition: service_started
+
+  # Headless-browser UI checks (screenshots per viewport, console errors,
+  # no-requests-on-hover). Not started by `up`; run on demand:
+  #   docker compose run --rm ui-check
+  ui-check:
+    image: mcr.microsoft.com/playwright:v1.56.0-noble
+    profiles: ["tools"]
+    working_dir: /app/tools/ui-check
+    ipc: host
+    environment:
+      BASE_URL: http://client:5173
+    volumes:
+      - .:/app
+      - ui_check_modules:/app/tools/ui-check/node_modules
+    entrypoint: ["sh", "-c", 'npm install --no-audit --no-fund --silent && exec "$$@"', "--"]
+    # Expects the stack to be running already (`docker compose up -d`).
+    command: ["node", "check.mjs"]
+
+volumes:
+  postgres_data:
+  node_modules:
+  ui_check_modules:
+  server_node_modules:
+  client_node_modules:

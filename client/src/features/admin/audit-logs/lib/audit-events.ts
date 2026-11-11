@@ -1,0 +1,26 @@
+// Labels of the tracked administrative events (server/src/lib/audit-log.ts
+// ADMIN_AUDIT_EVENTS) - the options of the audit log "event" filter.
+export const ADMIN_AUDIT_EVENT_LABELS: string[] = [
+  "User Created",
+  "User Updated",
+  "Password Reset",
+  "Role Changed",
+  "User Suspended",
+  "Classroom Archived",
+  "Assignment Deleted",
+  "Assignment Archived",
+  "Assignment Restored",
+  "Announcement Deleted",
+  "Announcement Archived",
+  "Announcement Restored",
+  "Material Deleted",
+  "Material Archived",
+  "Material Restored",
+  "Comment Deleted",
+  "Comment Archived",
+  "Comment Restored",
+  "Account Locked",
+  "Account Unlocked",
+  "Session Terminated",
+  "Timetable Clash Resolved",
+];

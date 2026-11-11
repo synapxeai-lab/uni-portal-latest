@@ -1,0 +1,443 @@
+@import "tailwindcss";
+
+/* Dark mode follows <html data-theme>, set from the user's light / dark /
+   system choice (src/lib/theme.ts), not the OS media query directly. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Self-hosted variable fonts (@fontsource-variable, imported in main.tsx) -
+   the same --font-rubik / --font-nunito variables next/font used to set. */
+:root {
+  --font-rubik: "Rubik Variable";
+  --font-nunito: "Nunito Variable";
+}
+
+/*
+ * EITHM design tokens - follows ui-theme-guide.md (the EITHM Portal visual
+ * language): navy is primary, gold is the call to action, warm quiet
+ * surfaces, navy-tinted shadows.
+ *
+ * The raw brand palette is defined once here and everything else - semantic
+ * tokens, sidebar, status colours - is derived from it. Feature code reaches
+ * for the semantic utilities (bg-primary, text-muted-foreground, bg-accent,
+ * border-border-strong, ...) rather than raw hex or Tailwind palette colours.
+ */
+:root {
+  color-scheme: light;
+
+  /* Brand palette (raw - use the semantic tokens below in components) */
+  --navy: #171f32;
+  --navy-deep: #011b4b;
+  --royal: #3f3c8f;
+  --gold: #d9a11e;
+  --gold-hover: #c08e19;
+  --gold-light: #f2b233;
+  --gold-soft: #fff8e6; /* gold tint: hover / selected backgrounds */
+  --gold-border: #ffe9b3; /* border on gold-tint surfaces */
+  --gold-foreground: var(--navy);
+
+  /* Surfaces & text */
+  --background: #f9f8f8;
+  --foreground: #101010;
+  --card: #ffffff;
+  --card-foreground: #101010;
+  --popover: #ffffff;
+  --popover-foreground: #101010;
+  --mid-foreground: #394459; /* body copy, labels, secondary buttons */
+  --muted: #f3f2f0; /* table header, read-only fields, muted badges */
+  --muted-foreground: #5f6675; /* meta text, captions, table headers */
+  --faint-foreground: #8a909c; /* footnotes, decorative icons */
+  --border: #e5e3df;
+  --border-strong: #cccccc; /* hover borders, outline buttons */
+  --input: var(--border);
+
+  /* Actions */
+  --primary: var(--navy);
+  --primary-hover: var(--navy-deep);
+  --primary-foreground: #ffffff;
+  --primary-ring: rgb(217 161 30 / 0.35); /* 3px gold glow on focused inputs */
+  --secondary: var(--muted);
+  --secondary-foreground: var(--mid-foreground);
+  --accent: var(--gold-soft);
+  --accent-foreground: var(--navy);
+  --cta: var(--gold);
+  --cta-hover: var(--gold-hover);
+  --cta-foreground: #ffffff;
+  --link: var(--royal);
+  --link-hover: var(--navy);
+  --ring: var(--royal); /* focus outline */
+
+  /* Status - always paired with a text label, never colour alone. */
+  --success: #15803d;
+  --success-soft: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #92400e;
+  --warning-soft: #fef3c7;
+  --warning-border: #fde68a;
+  --destructive: #be123c;
+  --destructive-hover: #9f1239;
+  --destructive-soft: #fff1f2;
+  --destructive-border: #fecdd3;
+  --destructive-foreground: #ffffff;
+  --info: var(--royal);
+  --info-soft: #eeedf8;
+  --info-border: #cfcdeb;
+
+  /* Navigation chrome: navy rail, gold active state. */
+  --sidebar: var(--navy);
+  --sidebar-foreground: #e0e0e0;
+  --sidebar-muted: rgb(224 224 224 / 0.45);
+  --sidebar-border: rgb(255 255 255 / 0.1);
+  --sidebar-accent: rgb(255 255 255 / 0.06); /* hover */
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-active: rgb(217 161 30 / 0.14);
+  --sidebar-primary: var(--gold);
+  --sidebar-ring: var(--gold);
+
+  /* Skeletons */
+  --skeleton-base: #eceae6;
+  --skeleton-highlight: #f7f6f3;
+
+  /* Scrollbars */
+  --scrollbar-thumb: #cccccc;
+  --scrollbar-thumb-hover: #a8a8a8;
+}
+
+/* Dark theme - not part of the portal guide; derived from the same tokens. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --gold-soft: #2a2108;
+  --gold-border: #4a3a10;
+  --gold-foreground: var(--gold);
+
+  --background: #0f1524;
+  --foreground: #eef0f5;
+  --card: #171f32;
+  --card-foreground: #eef0f5;
+  --popover: #171f32;
+  --popover-foreground: #eef0f5;
+  --mid-foreground: #c4cad6;
+  --muted: #1e2840;
+  --muted-foreground: #9aa2b4;
+  --faint-foreground: #6f7789;
+  --border: #2a3550;
+  --border-strong: #3d4a68;
+
+  /* Navy buttons would vanish on a navy page - gold carries primary in dark mode. */
+  --primary: var(--gold);
+  --primary-hover: var(--gold-light);
+  --primary-foreground: #101010;
+  --accent: #2a2108;
+  --accent-foreground: var(--gold-light);
+  --cta-foreground: #101010;
+  --link: #a9a6f0;
+  --link-hover: #ffffff;
+  --ring: #a9a6f0;
+
+  --success: #4ade80;
+  --success-soft: #0d2a1c;
+  --success-border: #14532d;
+  --warning: #fbbf24;
+  --warning-soft: #2a2108;
+  --warning-border: #4a3a10;
+  --destructive: #fb7185;
+  --destructive-hover: #fda4af;
+  --destructive-soft: #2d0f17;
+  --destructive-border: #5b1a2a;
+  --destructive-foreground: #101010;
+  --info: #a9a6f0;
+  --info-soft: #1d1b40;
+  --info-border: #33307a;
+
+  --sidebar: #0b1020;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+
+  --skeleton-base: #1e2840;
+  --skeleton-highlight: #27324d;
+
+  --scrollbar-thumb: #3d4a68;
+  --scrollbar-thumb-hover: #55638a;
+}
+
+@theme inline {
+  --color-navy: var(--navy);
+  --color-navy-deep: var(--navy-deep);
+  --color-royal: var(--royal);
+  --color-gold: var(--gold);
+  --color-gold-hover: var(--gold-hover);
+  --color-gold-light: var(--gold-light);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-border: var(--gold-border);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-mid-foreground: var(--mid-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ring: var(--primary-ring);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-cta: var(--cta);
+  --color-cta-hover: var(--cta-hover);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-border: var(--destructive-border);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-skeleton: var(--skeleton-base);
+  --color-skeleton-highlight: var(--skeleton-highlight);
+
+  /* Radius: 6px inputs/buttons, 8px nav items/stat cards, 10px cards/tables,
+     16px modals and the login card. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+
+  /* Navy-tinted shadows, never black. */
+  --shadow-xs: 0 1px 2px rgb(23 31 50 / 0.05);
+  --shadow-sm: 0 2px 6px rgb(23 31 50 / 0.07);
+  --shadow-md: 0 6px 18px rgb(23 31 50 / 0.09);
+  --shadow-lg: 0 8px 40px rgb(23 31 50 / 0.16);
+  --shadow-xl: 0 20px 48px rgb(23 31 50 / 0.18);
+
+  /* Rubik for body copy and controls, Nunito for headings. `font-serif` is
+     kept as an alias of the heading face so existing heading markup follows. */
+  --font-sans:
+    var(--font-rubik), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-heading:
+    var(--font-nunito), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-serif: var(--font-heading);
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+
+  --animate-fade-in: fade-in 0.25s ease both;
+  --animate-dialog-in: dialog-in 0.18s ease both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@layer base {
+  /* 18px root on desktop, 16px on phones/tablets - rem-based sizes scale with it. */
+  html {
+    font-size: 18px;
+    scroll-behavior: smooth;
+  }
+
+  @media (max-width: 768px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+
+  /* Royal-blue focus outline everywhere; gold inside the navy sidebar. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  [data-sidebar] :focus-visible {
+    outline-color: var(--sidebar-ring);
+  }
+
+  /* In the base layer so utilities like scrollbar-on-hover can override it. */
+  * {
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  @supports not (scrollbar-color: auto) {
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      border: 2px solid transparent;
+      border-radius: 9999px;
+      background-clip: padding-box;
+      background-color: var(--scrollbar-thumb);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: var(--scrollbar-thumb-hover);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+ * Navigation rails: the scrollbar stays invisible until the rail is hovered
+ * or holds keyboard focus. Its space is still reserved, so links don't shift.
+ */
+@utility scrollbar-on-hover {
+  scrollbar-color: transparent transparent;
+  scrollbar-gutter: stable;
+
+  &:hover,
+  &:focus-within {
+    scrollbar-color: var(--sidebar-muted) transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  &:hover::-webkit-scrollbar-thumb,
+  &:focus-within::-webkit-scrollbar-thumb {
+    background-color: var(--sidebar-muted);
+  }
+}
+
+/* Loading placeholder: warm grey block with a soft highlight sweep. */
+@utility skeleton-shimmer {
+  background-color: var(--skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+
+  @media (prefers-reduced-motion: reduce) {
+    background-image: none;
+    animation: none;
+  }
+}
+
+/* Text link that turns into a sidebar-coloured pill on hover instead of
+   underlining. Pair with -mx-3 -my-1.5 where the link must keep its text
+   aligned with surrounding content (titles in cards and table cells). */
+@utility link-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.375rem 0.75rem;
+  text-decoration: none;
+  outline: none;
+  transition:
+    background-color 150ms,
+    color 150ms;
+
+  &:hover {
+    background-color: var(--sidebar);
+    color: var(--sidebar-accent-foreground);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+}
