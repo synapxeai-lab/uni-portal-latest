@@ -22,6 +22,7 @@ import {
   ListPlus,
   NotebookPen,
   Presentation,
+  Receipt,
   UserRoundCheck,
   ScrollText,
   Settings,
@@ -91,6 +92,7 @@ export const navSections: NavSection[] = [
       { label: "Attendance", href: "/my-attendance", icon: CalendarCheck, roles: [UserRole.STUDENT] },
       { label: "Marks", href: "/my-marks", icon: BookCheck, roles: [UserRole.STUDENT] },
       { label: "Transcript", href: "/transcript", icon: FileText, roles: [UserRole.STUDENT] },
+      { label: "Fee challan", href: "/fee-challan", icon: Receipt, roles: [UserRole.STUDENT] },
     ],
   },
   {
@@ -122,6 +124,7 @@ export const navSections: NavSection[] = [
       { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
       { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck, roles: [UserRole.ADMIN] },
       { label: "Grades", href: "/admin/grades", icon: Award, roles: [UserRole.ADMIN] },
+      { label: "Fees", href: "/admin/fees", icon: Receipt, roles: [UserRole.ADMIN] },
       {
         label: "Assign teachers",
         href: "/admin/assign-teachers",

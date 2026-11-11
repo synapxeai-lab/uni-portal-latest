@@ -37,6 +37,7 @@ import { offeringsRouter } from "@/features/academics/offerings.routes";
 import { registrationRouter } from "@/features/academics/registration.routes";
 import { attendanceRouter } from "@/features/academics/attendance.routes";
 import { marksRouter } from "@/features/academics/marks.routes";
+import { feesRouter } from "@/features/academics/fees.routes";
 
 export function createApp() {
   const app = express();
@@ -92,6 +93,7 @@ export function createApp() {
   api.use(registrationRouter);
   api.use(attendanceRouter);
   api.use(marksRouter);
+  api.use(feesRouter);
   api.use("/admin/settings", requireAdmin, settingsRouter);
   api.use("/admin", requireAdmin, adminRouter);
 

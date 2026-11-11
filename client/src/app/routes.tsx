@@ -58,6 +58,8 @@ const ClassroomMarksPage = lazy(() => import("@/pages/classes/marks-page"));
 const GradesPage = lazy(() => import("@/pages/university/grades-page"));
 const MyMarksPage = lazy(() => import("@/pages/university/my-marks-page"));
 const TranscriptPage = lazy(() => import("@/pages/university/transcript-page"));
+const FeesPage = lazy(() => import("@/pages/university/fees-page"));
+const MyChallansPage = lazy(() => import("@/pages/university/my-challans-page"));
 
 export function AppRoutes() {
   return (
@@ -79,6 +81,7 @@ export function AppRoutes() {
             <Route path="/my-attendance" element={<MyAttendancePage />} />
             <Route path="/my-marks" element={<MyMarksPage />} />
             <Route path="/transcript" element={<TranscriptPage />} />
+            <Route path="/fee-challan" element={<MyChallansPage />} />
           </Route>
           <Route element={<RoleRoute roles={[UserRole.TEACHER, UserRole.ADMIN]} denied="review" />}>
             <Route path="/review" element={<ReviewPage />} />
@@ -132,6 +135,7 @@ export function AppRoutes() {
           <Route path="registration" element={<RegistrationsPage />} />
           <Route path="attendance" element={<AttendanceOverviewPage />} />
           <Route path="grades" element={<GradesPage />} />
+          <Route path="fees" element={<FeesPage />} />
           <Route path="settings" element={<Navigate to="/settings#platform" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

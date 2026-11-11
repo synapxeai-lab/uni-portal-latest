@@ -12,6 +12,7 @@ import * as batchService from "./services/batch-service";
 import * as courseService from "./services/course-service";
 import * as departmentService from "./services/department-service";
 import * as programmeService from "./services/programme-service";
+import { syncChallansForCourses, syncChallansForDiploma } from "./services/fee-service";
 import * as sectionService from "./services/section-service";
 
 /**
@@ -112,6 +113,8 @@ structureRouter.put("/departments/:id", requireAdmin, async (req, res) => {
     intParam(req, "id", "diploma ID"),
     await parseInputAsync(departmentService.updateDepartmentSchema, req.body),
   );
+  // A new whole-diploma discount changes what its students owe.
+  await syncChallansForDiploma(department.id);
   invalidateUniversity();
   done(res, { department, message: "Diploma updated." });
 });
@@ -172,6 +175,7 @@ structureRouter.put("/courses/:id", requireAdmin, async (req, res) => {
     intParam(req, "id", "course ID"),
     parseInput(courseService.updateCourseSchema, req.body),
   );
+  await syncChallansForCourses([course.id]);
   invalidateUniversity();
   done(res, { course, message: "Course updated." });
 });
@@ -185,6 +189,7 @@ structureRouter.delete("/courses/:id", requireAdmin, async (req, res) => {
 structureRouter.post("/courses/:id/fees", requireAdmin, async (req, res) => {
   const input = parseInput(courseService.extraFeeSchema, req.body);
   const course = await courseService.addExtraFee(intParam(req, "id", "course ID"), input);
+  await syncChallansForCourses([course.id]);
   invalidateUniversity();
   done(res, { course, message: `${input.name} added.` }, 201);
 });
@@ -196,6 +201,7 @@ structureRouter.put("/courses/:id/fees/:feeId", requireAdmin, async (req, res) =
     intParam(req, "feeId", "fee ID"),
     input,
   );
+  await syncChallansForCourses([course.id]);
   invalidateUniversity();
   done(res, { course, message: `${input.name} updated.` });
 });
@@ -205,6 +211,7 @@ structureRouter.delete("/courses/:id/fees/:feeId", requireAdmin, async (req, res
     intParam(req, "id", "course ID"),
     intParam(req, "feeId", "fee ID"),
   );
+  await syncChallansForCourses([course.id]);
   invalidateUniversity();
   done(res, { course, message: `${fee.name} removed.` });
 });
