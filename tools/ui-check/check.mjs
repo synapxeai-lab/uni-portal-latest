@@ -29,7 +29,7 @@ const COMMON_PAGES = [
   "/notifications",
   "/calendar",
   "/timetable",
-  "/search?q=geometry",
+  "/search?q=destination",
   "/profile",
   "/settings",
   "/classes",

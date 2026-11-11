@@ -346,14 +346,14 @@ FLOWS.search = async function search(browser) {
   // Global shortcut opens the dialog from anywhere; results are debounced fetches.
   await student.page.keyboard.press("Control+k");
   const input = student.page.getByRole("dialog").getByPlaceholder(/search classes, announcements/i);
-  await input.fill("geometry");
+  await input.fill("destination");
   await expectVisible(
-    student.page.getByRole("dialog").getByText("Coordinate Geometry Quiz"),
+    student.page.getByRole("dialog").getByText("Destination profile").first(),
     "a search result in the Ctrl+K dialog",
   );
   await input.press("Enter");
-  await student.page.waitForURL("**/search?q=geometry**");
-  await expectVisible(student.page.getByText(/results for "geometry"/i), "the search results page");
+  await student.page.waitForURL("**/search?q=destination**");
+  await expectVisible(student.page.getByText(/results for "destination"/i), "the search results page");
   if (student.errors.length) throw new Error(`Page errors: ${student.errors.join("; ")}`);
   await student.context.close();
 };
