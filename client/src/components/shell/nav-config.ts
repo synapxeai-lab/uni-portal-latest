@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Archive,
+  Backpack,
   Bell,
   BookOpen,
   Calendar,
@@ -12,6 +13,7 @@ import {
   GraduationCap,
   LayoutGrid,
   Library,
+  Presentation,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -89,6 +91,8 @@ export const navSections: NavSection[] = [
         roles: [UserRole.ADMIN],
         matches: ["/admin/sections"],
       },
+      { label: "Teachers", href: "/admin/teachers", icon: Presentation, roles: [UserRole.ADMIN] },
+      { label: "Students", href: "/admin/students", icon: Backpack, roles: [UserRole.ADMIN] },
     ],
   },
   {

@@ -55,6 +55,9 @@ const DEFAULT_PAGES = {
     "/admin/batches",
     "/admin/batches/{batch}",
     "/admin/sections/{sectionId}",
+    "/admin/teachers",
+    "/admin/students",
+    "/admin/students/{academicStudentId}",
     "/change-password",
   ],
   teacher: [
@@ -155,9 +158,10 @@ for (const role of roles) {
       // University records for the admin pages: the first diploma with a section.
       const uni = await page.evaluate(async () => {
         const get = (url) => fetch(url).then((r) => r.json());
-        const [{ categories }, { departments }] = await Promise.all([
+        const [{ categories }, { departments }, { students }] = await Promise.all([
           get("/api/programme-categories"),
           get("/api/departments"),
+          get("/api/students"),
         ]);
         const department = departments.find((d) => d.sections.length && d.courses.length) ?? departments[0];
         const section = department?.sections[0];
@@ -167,6 +171,7 @@ for (const role of roles) {
           courseId: department?.courses[0]?.id ?? "none",
           sectionId: section?.id ?? "none",
           batch: section ? encodeURIComponent(section.batch) : "none",
+          academicStudentId: students[0]?.id ?? "none",
         };
       });
       Object.assign(ids, uni);

@@ -30,6 +30,7 @@ interface Context {
   departmentId?: number;
   courseId?: number;
   sectionId?: number;
+  academicStudentId?: number;
 }
 
 /** The Calendar page's request for the current month (ranges as the browser computes them). */
@@ -87,6 +88,9 @@ function endpointsFor(role: Role, ctx: Context): string[] {
           ...(ctx.departmentId ? [`/departments/${ctx.departmentId}`] : []),
           ...(ctx.courseId ? [`/courses/${ctx.courseId}`] : []),
           ...(ctx.sectionId ? [`/sections/${ctx.sectionId}`] : []),
+          "/teachers",
+          "/students",
+          ...(ctx.academicStudentId ? [`/students/${ctx.academicStudentId}`] : []),
         ]
       : []),
   ];
@@ -192,6 +196,7 @@ for (const role of Object.keys(ACCOUNTS) as Role[]) {
     ctx.departmentId = department?.id;
     ctx.courseId = department?.courses[0]?.id;
     ctx.sectionId = department?.sections[0]?.id;
+    ctx.academicStudentId = (await getJson<{ students: { id: number }[] }>("/students")).students[0]?.id;
   }
 
   for (const path of endpointsFor(role, ctx)) {

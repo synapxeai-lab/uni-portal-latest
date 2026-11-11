@@ -42,6 +42,9 @@ const CoursePage = lazy(() => import("@/pages/university/course-page"));
 const BatchesPage = lazy(() => import("@/pages/university/batches-page"));
 const BatchPage = lazy(() => import("@/pages/university/batch-page"));
 const SectionPage = lazy(() => import("@/pages/university/section-page"));
+const TeachersPage = lazy(() => import("@/pages/university/teachers-page"));
+const StudentsPage = lazy(() => import("@/pages/university/students-page"));
+const StudentPage = lazy(() => import("@/pages/university/student-page"));
 
 export function AppRoutes() {
   return (
@@ -97,6 +100,9 @@ export function AppRoutes() {
           <Route path="batches" element={<BatchesPage />} />
           <Route path="batches/:batch" element={<BatchPage />} />
           <Route path="sections/:id" element={<SectionPage />} />
+          <Route path="teachers" element={<TeachersPage />} />
+          <Route path="students" element={<StudentsPage />} />
+          <Route path="students/:id" element={<StudentPage />} />
           <Route path="settings" element={<Navigate to="/settings#platform" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

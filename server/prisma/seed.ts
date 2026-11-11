@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { seedAccounts } from "./seed/accounts";
 import { seedAcademics } from "./seed/academics";
 import { seedPlatform } from "./seed/platform";
+import { seedPeople } from "./seed/people";
 
 async function main() {
   await seedPlatform(prisma);
@@ -20,6 +21,8 @@ async function main() {
   console.log(`Accounts: ${accounts.length}`);
   const academics = await seedAcademics(prisma);
   console.log(`Programme ${academics.programme}: ${academics.diplomaIds.length} diplomas`);
+  const people = await seedPeople(prisma);
+  console.log(`People: ${people.teachers} teachers, ${people.students} students`);
 }
 
 main()
