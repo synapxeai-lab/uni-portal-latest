@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink, UserRoundCheck } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
@@ -18,6 +18,7 @@ import {
   useUniversityQuery,
 } from "@/features/academics/api";
 import type { TeacherRecord } from "@/features/academics/components/people-dialogs";
+import { personLabels } from "@/features/academics/lib/people";
 import { runAction, TableCard } from "@/features/academics/components/ui";
 
 interface AssignmentCourse {
@@ -50,6 +51,7 @@ export default function AssignTeachersPage() {
     { keepPrevious: true },
   );
   const teachers = useUniversityQuery<{ teachers: TeacherRecord[] }>("/teachers").data?.teachers ?? [];
+  const teacherLabels = useMemo(() => personLabels(teachers), [teachers]);
   const [saving, setSaving] = useState<string | null>(null);
 
   return (
@@ -148,7 +150,7 @@ export default function AssignTeachersPage() {
                             <option value="">Not assigned</option>
                             {teachers.map((teacher) => (
                               <option key={teacher.id} value={teacher.id}>
-                                {teacher.name}
+                                {teacherLabels.get(teacher.id)}
                               </option>
                             ))}
                           </Select>
