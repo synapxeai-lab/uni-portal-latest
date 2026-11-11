@@ -81,6 +81,8 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     ...(role === "admin" ? ["/timetable/clashes"] : []),
     "/programme-categories",
     "/batches",
+    "/registrations/current",
+    ...(role === "student" ? ["/my/registration", "/my/courses"] : []),
     ...(role === "admin"
       ? [
           "/departments",
@@ -92,6 +94,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
           "/students",
           "/offerings",
           "/assignments",
+          "/registrations",
           ...(ctx.departmentId ? [`/offerings/${ctx.departmentId}/2026`] : []),
           ...(ctx.academicStudentId ? [`/students/${ctx.academicStudentId}`] : []),
         ]

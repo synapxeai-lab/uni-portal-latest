@@ -48,6 +48,9 @@ const StudentPage = lazy(() => import("@/pages/university/student-page"));
 const OfferingsPage = lazy(() => import("@/pages/university/offerings-page"));
 const BatchOfferingsPage = lazy(() => import("@/pages/university/batch-offerings-page"));
 const AssignTeachersPage = lazy(() => import("@/pages/university/assign-teachers-page"));
+const RegistrationsPage = lazy(() => import("@/pages/university/registrations-page"));
+const StudentRegistrationPage = lazy(() => import("@/pages/university/student-registration-page"));
+const MyCoursesPage = lazy(() => import("@/pages/university/my-courses-page"));
 
 export function AppRoutes() {
   return (
@@ -63,6 +66,10 @@ export function AppRoutes() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/timetable" element={<TimetablePage />} />
           <Route path="/todo" element={<TodoPage />} />
+          <Route element={<RoleRoute roles={[UserRole.STUDENT]} denied="student" />}>
+            <Route path="/my-courses" element={<MyCoursesPage />} />
+            <Route path="/registration" element={<StudentRegistrationPage />} />
+          </Route>
           <Route element={<RoleRoute roles={[UserRole.TEACHER, UserRole.ADMIN]} denied="review" />}>
             <Route path="/review" element={<ReviewPage />} />
           </Route>
@@ -109,6 +116,7 @@ export function AppRoutes() {
           <Route path="offerings" element={<OfferingsPage />} />
           <Route path="offerings/:departmentId/:batch" element={<BatchOfferingsPage />} />
           <Route path="assign-teachers" element={<AssignTeachersPage />} />
+          <Route path="registration" element={<RegistrationsPage />} />
           <Route path="settings" element={<Navigate to="/settings#platform" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

@@ -61,6 +61,7 @@ const DEFAULT_PAGES = {
     "/admin/offerings",
     "/admin/offerings/{departmentId}/{batch}",
     "/admin/assign-teachers",
+    "/admin/registration",
     "/change-password",
   ],
   teacher: [
@@ -70,7 +71,7 @@ const DEFAULT_PAGES = {
     "/classes/{classroomId}/classwork/{assignmentId}/submissions/{studentId}",
     "/change-password",
   ],
-  student: [...COMMON_PAGES, "/todo"],
+  student: [...COMMON_PAGES, "/todo", "/my-courses", "/registration"],
 };
 
 const VIEWPORTS = {

@@ -71,7 +71,7 @@ describe("course offerings and their classrooms", () => {
     const assignments = await admin.get<{ courses: { id: number; rows: AssignmentRow[] }[] }>(
       `/assignments?departmentId=${departmentId}`,
     );
-    const row = assignments.data.courses.find((c) => c.id === courseId)!.rows.find((r) => r.section)!;
+    const row = assignments.data.courses.find((c) => c.id === courseId)!.rows[0];
     expect(row.offered).toBe(true);
     expect(row.classroomId).toBeTruthy();
 

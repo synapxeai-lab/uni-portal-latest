@@ -2,10 +2,12 @@ import type { LucideIcon } from "lucide-react";
 import {
   Archive,
   Backpack,
+  BookMarked,
   Bell,
   BookOpen,
   Calendar,
   CalendarClock,
+  CalendarPlus,
   CalendarRange,
   CalendarX,
   ClipboardCheck,
@@ -14,6 +16,7 @@ import {
   LayoutGrid,
   Library,
   ListPlus,
+  NotebookPen,
   Presentation,
   UserRoundCheck,
   ScrollText,
@@ -76,6 +79,13 @@ export const navSections: NavSection[] = [
     ],
   },
   {
+    label: "Academics",
+    items: [
+      { label: "My courses", href: "/my-courses", icon: BookMarked, roles: [UserRole.STUDENT] },
+      { label: "Registration", href: "/registration", icon: NotebookPen, roles: [UserRole.STUDENT] },
+    ],
+  },
+  {
     label: "University",
     items: [
       {
@@ -95,6 +105,12 @@ export const navSections: NavSection[] = [
       },
       { label: "Teachers", href: "/admin/teachers", icon: Presentation, roles: [UserRole.ADMIN] },
       { label: "Students", href: "/admin/students", icon: Backpack, roles: [UserRole.ADMIN] },
+      {
+        label: "Registration",
+        href: "/admin/registration",
+        icon: CalendarPlus,
+        roles: [UserRole.ADMIN],
+      },
       { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
       {
         label: "Assign teachers",
