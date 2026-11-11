@@ -8,7 +8,8 @@ import { getInitials } from "@/lib/utils";
 import type { ClassroomMemberSummary, ClassroomMembershipRole } from "../types";
 
 const ROLE_LABEL: Record<ClassroomMembershipRole, string> = {
-  OWNER: "Created By",
+  // A course classroom's owner is its assigned teacher, not necessarily whoever created it.
+  OWNER: "Owner",
   TEACHER: "Teacher",
   CO_TEACHER: "Co-teacher",
   STUDENT: "Student",
