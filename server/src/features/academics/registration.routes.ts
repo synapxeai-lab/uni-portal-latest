@@ -9,6 +9,7 @@ import { UserRole } from "@/generated/prisma/enums";
 import { done, intParam, parseInputAsync } from "./lib/http";
 import * as registrations from "./services/registration-service";
 import * as studentRegistration from "./services/student-registration-service";
+import * as summary from "./services/summary-service";
 
 /**
  * Registration periods (admin), the current term (everyone) and a student's
@@ -106,4 +107,20 @@ registrationRouter.post("/my/registration", student, async (req, res) => {
 registrationRouter.get("/my/courses", student, async (req, res) => {
   const userId = currentUser(req).id;
   res.json(await read(`my-courses:${userId}`, () => studentRegistration.getMyCourses(userId)));
+});
+
+// ---- Dashboard summary (every role) ----------------------------------------------------
+
+registrationRouter.get("/university/summary", async (req, res) => {
+  const user = currentUser(req);
+  const key = `university-summary:${user.role === "ADMIN" ? "admin" : user.id}`;
+  res.json(
+    await read<unknown>(key, () =>
+      user.role === "ADMIN"
+        ? summary.adminSummary()
+        : user.role === "TEACHER"
+          ? summary.teacherSummary(user.id)
+          : summary.studentSummary(user.id),
+    ),
+  );
 });

@@ -155,7 +155,8 @@ async function syncOne(sectionCourseId: number, actorId: string | null): Promise
 
 /**
  * Registered students are active members; students (users with a student
- * profile) no longer registered are removed. Members added by hand who aren't
+ * profile, or whose account was archived with their profile) no longer
+ * registered are removed. Members added by hand who aren't
  * university students (e.g. guests) are left alone.
  */
 async function syncStudents(classroomId: string, courseId: number, sectionId: number) {
@@ -166,7 +167,11 @@ async function syncStudents(classroomId: string, courseId: number, sectionId: nu
     }),
     prisma.classroomMembership.findMany({
       where: { classroomId, role: ClassroomMembershipRole.STUDENT },
-      select: { userId: true, status: true, user: { select: { studentProfile: { select: { id: true } } } } },
+      select: {
+        userId: true,
+        status: true,
+        user: { select: { status: true, studentProfile: { select: { id: true } } } },
+      },
     }),
   ]);
   const registered = new Set(enrollments.map((e) => e.student.userId!));
@@ -176,7 +181,9 @@ async function syncStudents(classroomId: string, courseId: number, sectionId: nu
   const toRemove = memberships
     .filter(
       (m) =>
-        m.status === ClassroomMembershipStatus.ACTIVE && m.user.studentProfile && !registered.has(m.userId),
+        m.status === ClassroomMembershipStatus.ACTIVE &&
+        (m.user.studentProfile || m.user.status === UserStatus.ARCHIVED) &&
+        !registered.has(m.userId),
     )
     .map((m) => m.userId);
 

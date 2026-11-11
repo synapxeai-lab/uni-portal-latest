@@ -136,3 +136,46 @@ describe("student registration", () => {
     expect(another.status).toBe(409);
   });
 });
+
+describe("deleting a registered student", () => {
+  it("takes them off their classes' rosters", async () => {
+    const admin = await signIn("admin");
+    const created = await admin.post<{ student: { id: number }; login: { email: string; password: string } }>("/students", {
+      name: "Roster Leaver",
+      rollNo: unique("LEAVE"),
+      email: `${unique("leave")}@eithm.edu.pk`,
+      phone: "0300",
+      address: "Lahore",
+      cnic: cnic(),
+      dob: "2005-01-01",
+      gender: "MALE",
+      lastQualification: "FSc",
+      passingYear: 2024,
+      grade: "A",
+      university: "BISE",
+      programme: "TOURISM",
+      batch: "2026",
+      section: "A",
+      guardianName: "G",
+      guardianContact: "0300",
+      guardianCnic: cnic(),
+      guardianRelationship: "Father",
+      guardianEmail: "g@example.com",
+    });
+    const student = await new ApiSession().login(created.data.login.email, created.data.login.password);
+    const page = (await student.get<MyRegistration>("/my/registration")).data;
+    const course = page.courses[0];
+    await student.post("/my/registration", { courseId: course.id, sectionId: course.defaultSectionId });
+    const classroom = (await student.get<{ id: string; offering: { courseId: number } | null }[]>("/classrooms")).data.find(
+      (c) => c.offering?.courseId === course.id,
+    )!;
+
+    const people = async () =>
+      (await admin.get<{ roster: { students: { email: string }[] } }>(`/classrooms/${classroom.id}/people`)).data.roster.students.map(
+        (s) => s.email,
+      );
+    expect(await people()).toContain(created.data.login.email);
+    await admin.delete(`/students/${created.data.student.id}`);
+    expect(await people()).not.toContain(created.data.login.email);
+  });
+});

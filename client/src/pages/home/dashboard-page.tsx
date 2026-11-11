@@ -4,6 +4,7 @@ import { AdminDashboardView } from "@/features/dashboard/components/admin-dashbo
 import { StudentDashboardView } from "@/features/dashboard/components/student-dashboard-view";
 import { TeacherDashboardView } from "@/features/dashboard/components/teacher-dashboard-view";
 import { WelcomeCard } from "@/features/dashboard/components/welcome-card";
+import { UniversitySummary } from "@/features/academics/components/university-summary";
 import { AppLoading } from "@/app/layouts";
 import { QueryView } from "@/app/route-states";
 import { useSession } from "@/lib/auth";
@@ -21,8 +22,9 @@ export default function DashboardPage() {
             <PageContainer>
               <WelcomeCard
                 name={name}
-                description="You have full administrative access. Manage users, classrooms, and monitor platform-wide activity from here."
+                description="The whole institute at a glance: academic records, fees, classrooms and platform activity."
               />
+              <UniversitySummary />
               <AdminDashboardView data={response.data} />
             </PageContainer>
           );
@@ -32,8 +34,9 @@ export default function DashboardPage() {
             <PageContainer>
               <WelcomeCard
                 name={name}
-                description="Your classes, review queue, and scheduled content at a glance."
+                description="Your course sections, review queue and scheduled content at a glance."
               />
+              <UniversitySummary />
               <TeacherDashboardView data={response.data} />
             </PageContainer>
           );
@@ -42,8 +45,9 @@ export default function DashboardPage() {
           <PageContainer>
             <WelcomeCard
               name={name}
-              description="Your classes, upcoming deadlines, and archived classes at a glance."
+              description="Your studies, classes and upcoming deadlines at a glance."
             />
+            <UniversitySummary />
             <StudentDashboardView data={response.data} classrooms={response.classrooms} />
           </PageContainer>
         );

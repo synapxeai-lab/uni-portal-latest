@@ -50,7 +50,12 @@ describe("course offerings and their classrooms", () => {
   });
 
   afterAll(async () => {
+    // Deleting the diploma archives its classrooms; then remove the test classrooms entirely.
+    const ids = (await classroomsOf(admin)).map((c) => c.id);
     await admin.delete(`/departments/${departmentId}`);
+    for (const id of ids) {
+      await admin.delete(`/admin/classrooms/${id}`);
+    }
   });
 
   const classroomsOf = async (session: ApiSession) =>

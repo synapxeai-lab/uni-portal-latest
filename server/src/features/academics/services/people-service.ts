@@ -9,6 +9,7 @@ import { getBatchYears, isValidBatch } from "../lib/batches";
 import { conflictError, notFoundError } from "../lib/http";
 import { categoryKeyField } from "../lib/programme-categories";
 import { syncEnrolledSection } from "../lib/section-sync";
+import { syncClassroomsFor } from "../lib/offering-classrooms";
 import { amountField, payError, TEACHER_TYPES } from "../lib/teacher-pay";
 import { computeStudentSemester, withCurrentDiplomas } from "../lib/terms";
 import { archiveLogin, ensureLoginFor, syncLogin } from "../lib/user-accounts";
@@ -314,8 +315,15 @@ export async function deleteStudent(id: number) {
   if (!target) {
     throw notFoundError("Student not found.");
   }
+  // Their registrations go with them, so their classes lose them too.
+  const pairs = await prisma.enrollment.findMany({
+    where: { studentId: id },
+    select: { courseId: true, sectionId: true },
+    distinct: ["courseId", "sectionId"],
+  });
   await prisma.student.delete({ where: { id } });
   await archiveLogin(target.userId);
+  await syncClassroomsFor(pairs);
 }
 
 // ---- Section membership -----------------------------------------------------------------

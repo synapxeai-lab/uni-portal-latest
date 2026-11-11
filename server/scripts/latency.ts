@@ -83,6 +83,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     "/programme-categories",
     "/batches",
     "/registrations/current",
+    "/university/summary",
     ...(role === "student"
       ? ["/my/registration", "/my/courses", "/my/attendance", "/my/marks", "/my/transcript", "/my/challans"]
       : ["/grades"]),
