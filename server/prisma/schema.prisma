@@ -316,6 +316,10 @@ model Classroom {
   // follows the offering's teacher and the students registered for it.
   // Null for stand-alone classrooms a teacher creates by hand.
   sectionCourseId Int?            @unique
+  // "sectionId:courseId" of that offering. Kept when the course is no longer
+  // offered (the classroom is archived), so offering it again brings the same
+  // classroom back with its stream and classwork.
+  offeringKey     String?         @unique
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   deletedAt       DateTime?

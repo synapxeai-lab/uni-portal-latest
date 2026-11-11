@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
+import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 import { withCourseStatus } from "../lib/course-status";
 import { discountRateField, feeField } from "../lib/fee";
 import { conflictError, notFoundError } from "../lib/http";
@@ -204,6 +205,9 @@ export async function updateCourse(id: number, input: z.infer<typeof updateCours
   // Moving a course to another diploma drops its offerings and planned
   // teachers; it is re-offered to the new diploma's batches afterwards.
   const moved = departmentId !== target.departmentId;
+  if (moved) {
+    await archiveOfferingsWhere({ courseId: id });
+  }
   await prisma.$transaction([
     ...(moved
       ? [
@@ -220,6 +224,7 @@ export async function deleteCourse(id: number) {
   if (!(await prisma.course.count({ where: { id } }))) {
     throw notFoundError("Course not found.");
   }
+  await archiveOfferingsWhere({ courseId: id });
   await prisma.course.delete({ where: { id } });
 }
 

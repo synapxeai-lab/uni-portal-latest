@@ -13,7 +13,9 @@ import {
   GraduationCap,
   LayoutGrid,
   Library,
+  ListPlus,
   Presentation,
+  UserRoundCheck,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -93,6 +95,13 @@ export const navSections: NavSection[] = [
       },
       { label: "Teachers", href: "/admin/teachers", icon: Presentation, roles: [UserRole.ADMIN] },
       { label: "Students", href: "/admin/students", icon: Backpack, roles: [UserRole.ADMIN] },
+      { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
+      {
+        label: "Assign teachers",
+        href: "/admin/assign-teachers",
+        icon: UserRoundCheck,
+        roles: [UserRole.ADMIN],
+      },
     ],
   },
   {

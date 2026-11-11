@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 import { withCourseStatus } from "../lib/course-status";
+import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 import { applyDiscount, courseTotalFee, discountRateField } from "../lib/fee";
 import { conflictError, notFoundError } from "../lib/http";
 import { categoryKeyField } from "../lib/programme-categories";
@@ -189,5 +190,6 @@ export async function deleteDepartment(id: number) {
   if (!target) {
     throw notFoundError("Diploma not found.");
   }
+  await archiveOfferingsWhere({ section: { departmentId: id } });
   await prisma.department.delete({ where: { id } });
 }

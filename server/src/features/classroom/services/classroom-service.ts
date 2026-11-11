@@ -31,7 +31,11 @@ import type { ClassroomMemberSummary, ClassroomRoster, ClassroomSummary } from "
 const MAX_CODE_ATTEMPTS = 5;
 
 function classroomWithOwnerInclude() {
-  return { owner: { select: { name: true } } } as const;
+  return {
+    owner: { select: { name: true } },
+    // Set for the classroom of a university course offering.
+    sectionCourse: { select: { courseId: true, sectionId: true } },
+  } as const;
 }
 
 async function findClassroomWithOwnerByWhere(where: Prisma.ClassroomWhereUniqueInput) {
@@ -58,6 +62,7 @@ function toClassroomSummary(
     ownerName: classroom.owner.name,
     role,
     createdAt: classroom.createdAt,
+    offering: classroom.sectionCourse,
   };
 }
 

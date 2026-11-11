@@ -33,6 +33,7 @@ import { authRouter } from "@/features/auth/auth.routes";
 import { notificationRouter } from "@/features/notifications/notification.routes";
 import { structureRouter } from "@/features/academics/structure.routes";
 import { peopleRouter } from "@/features/academics/people.routes";
+import { offeringsRouter } from "@/features/academics/offerings.routes";
 
 export function createApp() {
   const app = express();
@@ -84,6 +85,7 @@ export function createApp() {
   api.use("/search", searchRouter);
   api.use(structureRouter);
   api.use(peopleRouter);
+  api.use(offeringsRouter);
   api.use("/admin/settings", requireAdmin, settingsRouter);
   api.use("/admin", requireAdmin, adminRouter);
 

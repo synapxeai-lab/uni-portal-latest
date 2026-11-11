@@ -19,6 +19,8 @@ export interface ClassroomSummary {
   /** The current viewer's membership role for this classroom. */
   role: ClassroomMembershipRole;
   createdAt: Date;
+  /** The university course offering this classroom belongs to (roster follows its registrations). */
+  offering: { courseId: number; sectionId: number } | null;
 }
 
 export interface ClassroomMemberSummary {

@@ -90,6 +90,9 @@ function endpointsFor(role: Role, ctx: Context): string[] {
           ...(ctx.sectionId ? [`/sections/${ctx.sectionId}`] : []),
           "/teachers",
           "/students",
+          "/offerings",
+          "/assignments",
+          ...(ctx.departmentId ? [`/offerings/${ctx.departmentId}/2026`] : []),
           ...(ctx.academicStudentId ? [`/students/${ctx.academicStudentId}`] : []),
         ]
       : []),

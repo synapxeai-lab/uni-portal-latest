@@ -58,6 +58,9 @@ const DEFAULT_PAGES = {
     "/admin/teachers",
     "/admin/students",
     "/admin/students/{academicStudentId}",
+    "/admin/offerings",
+    "/admin/offerings/{departmentId}/{batch}",
+    "/admin/assign-teachers",
     "/change-password",
   ],
   teacher: [

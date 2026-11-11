@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getAllBatches, getYearlyBatches } from "../lib/batches";
 import { conflictError, notFoundError } from "../lib/http";
 import { ensureDefaultSections } from "../lib/section-sync";
+import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 
 export const batchSchema = z
   .object({
@@ -101,6 +102,7 @@ export async function deleteBatch(name: string) {
       `Batch ${name} still has ${plural(studentCount, "student")}. Move or remove them before deleting the batch.`,
     );
   }
+  await archiveOfferingsWhere({ section: { batch: name } });
   const { count } = await prisma.$transaction(async (tx) => {
     const deleted = await tx.section.deleteMany({ where: { batch: name } });
     if (getYearlyBatches().includes(name)) {

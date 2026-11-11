@@ -7,6 +7,7 @@ import { isValidBatch } from "../lib/batches";
 import { notFoundError } from "../lib/http";
 import { badRequest } from "@/http/errors";
 import { syncStudentsForNewSection } from "../lib/section-sync";
+import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 
 export const createSectionSchema = z.object({
   departmentId: z.number().int("Diploma is required"),
@@ -67,6 +68,7 @@ export async function deleteSection(id: number) {
   if (!section) {
     throw notFoundError("Section not found.");
   }
+  await archiveOfferingsWhere({ sectionId: id });
   await prisma.section.delete({ where: { id } });
   return section;
 }
