@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ClipboardList, Plus, Scale, Trash2 } from "lucide-react";
+import { ClipboardList, Link2, Plus, Scale, Trash2 } from "lucide-react";
 
 import { EmptyState } from "@/components/states/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ interface Assessment {
   id: number;
   title: string;
   totalMarks: number;
+  /** The classroom assignment whose returned grades fill this item, if linked. */
+  assignment: { id: string; title: string } | null;
 }
 interface Summary {
   obtained: number;
@@ -59,6 +61,7 @@ interface Sheet {
     published: { grade: string; visibleFrom: Date } | null;
   }[];
   grading: { grades: GradeRange[]; custom: boolean };
+  classwork: { id: string; title: string; points: number; linked: boolean }[];
   weighted: boolean;
   totalWeightage: number;
   hasScheme: boolean;
@@ -96,14 +99,15 @@ function MarksDialog({
         return;
       }
     }
-    const ok = await runAction(
-      universityAction("put", `/marks/assessments/${assessment.id}/marks`, {
-        records: Object.entries(values).map(([enrollmentId, value]) => ({
-          enrollmentId: Number(enrollmentId),
-          obtained: value === "" ? null : Number(value),
-        })),
-      }),
-    );
+    // Only the boxes the teacher changed: a new total re-scales linked classwork marks on the server,
+    // and re-sending the old values would undo that.
+    const before = new Map(sheet.students.map((s) => [s.enrollmentId, s.marks[assessment.id] ?? null]));
+    const records = Object.entries(values)
+      .map(([enrollmentId, value]) => ({ enrollmentId: Number(enrollmentId), obtained: value === "" ? null : Number(value) }))
+      .filter((r) => r.obtained !== before.get(r.enrollmentId));
+    const ok =
+      records.length === 0 ||
+      (await runAction(universityAction("put", `/marks/assessments/${assessment.id}/marks`, { records })));
     setSaving(false);
     if (ok) onClose();
   }
@@ -114,7 +118,11 @@ function MarksDialog({
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{assessment.title}</DialogTitle>
-            <DialogDescription>Leave a box empty for a student who hasn't been marked yet.</DialogDescription>
+            <DialogDescription>
+              {assessment.assignment
+                ? `Filled from "${assessment.assignment.title}": each grade is copied here when the work is returned, scaled to this total.`
+                : "Leave a box empty for a student who hasn't been marked yet."}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex items-end gap-2">
             <div className="flex flex-col gap-1.5">
@@ -265,8 +273,10 @@ function TeacherMarks({ sectionId, courseId, isAdmin }: { sectionId: number; cou
                           key={a.id}
                           onClick={() => setEditing(a)}
                           className="rounded-md border border-border px-2 py-1 text-xs font-semibold hover:border-gold hover:bg-accent"
+                          title={a.assignment ? `From classwork: ${a.assignment.title}` : undefined}
                         >
                           {a.title} <span className="font-normal text-muted-foreground">/{a.totalMarks}</span>
+                          {a.assignment ? <Link2 className="ml-1 inline size-3 text-muted-foreground" aria-label="Linked to classwork" /> : null}
                         </button>
                       ))}
                     </div>
@@ -362,10 +372,27 @@ function TeacherMarks({ sectionId, courseId, isAdmin }: { sectionId: number; cou
               onOpenChange={(open) => !open && setAdding(null)}
               title={adding ? `Add to ${categoryLabel(adding.type)}` : ""}
               description="Items are numbered automatically (Quiz 3...); mid, practical and final are single exams."
-              fields={[{ name: "totalMarks", label: "Out of (total marks)", type: "number", required: true, min: 1, max: 1000 }]}
-              initialValues={{ totalMarks: 10 }}
+              fields={[
+                { name: "totalMarks", label: "Out of (total marks)", type: "number", required: true, min: 1, max: 1000 },
+                {
+                  name: "assignmentId",
+                  label: "Fill from classwork",
+                  type: "select",
+                  hint: "Returned grades of this assignment are copied in, scaled to the total.",
+                  placeholder: "None - I'll enter marks myself",
+                  options: sheet.classwork
+                    .filter((a) => !a.linked)
+                    .map((a) => ({ value: a.id, label: `${a.title} (${a.points} pts)` })),
+                },
+              ]}
+              initialValues={{ totalMarks: 10, assignmentId: "" }}
               submitLabel="Add"
-              onSubmit={(values) => universityAction("post", `/marks/categories/${adding!.id}/assessments`, values)}
+              onSubmit={(values) =>
+                universityAction("post", `/marks/categories/${adding!.id}/assessments`, {
+                  totalMarks: values.totalMarks,
+                  assignmentId: values.assignmentId || null,
+                })
+              }
             />
           </div>
         );

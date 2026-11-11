@@ -502,6 +502,7 @@ model Assignment {
   author      User         @relation("AssignmentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
   publishedBy User?        @relation("AssignmentPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
   submissions Submission[]
+  assessment  Assessment?
 
   @@index([classroomId, dueDate])
   @@index([topicId])
@@ -1093,6 +1094,9 @@ model Assessment {
   category   AssessmentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   title      String
   totalMarks Float
+  // Optional link to a classroom assignment: its returned grades are copied in, scaled to totalMarks.
+  assignmentId String?          @unique @db.Uuid
+  assignment   Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
   marks      Mark[]
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt

@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 import type { Prisma } from "@/generated/prisma/client";
+import { AssignmentStatus, ModerationStatus } from "@/generated/prisma/enums";
 import { badRequest } from "@/http/errors";
 import { prisma } from "@/lib/prisma";
 
 import { compareTypes, COMPONENTS, syncCourseCategories, syncSectionCategories, validateScheme } from "../lib/assessment-scheme";
 import { DEFAULT_GRADES, GRADE_LETTERS, type GradeRange, validateGrades } from "../lib/grading";
+import { importAssignmentMarks } from "../lib/classwork-marks";
 import { conflictError, notFoundError } from "../lib/http";
 import { summarizeEnrollments, summarizeMarks, weightsFor } from "../lib/marks-summary";
 import { assertTeachesOffering } from "../lib/self";
@@ -18,6 +20,10 @@ const SINGLE_TITLE: Record<string, string> = { MID: "Mid Term", PRACTICAL: "Prac
 
 export const totalMarksSchema = z.object({
   totalMarks: z.number({ error: "Total marks is required" }).positive("Total marks must be greater than 0").max(1000, "Total marks is too large"),
+});
+export const createAssessmentSchema = totalMarksSchema.extend({
+  // A classroom assignment whose returned grades fill this item's marks.
+  assignmentId: z.uuid("Pick a valid assignment").nullish(),
 });
 export const saveMarksSchema = z.object({
   records: z.array(
@@ -58,10 +64,13 @@ export const releaseDateSchema = z.object({ visibleFrom: z.coerce.date({ error: 
 export async function getMarksSheet(viewer: Viewer, sectionId: number, courseId: number) {
   const offering = await assertTeachesOffering(viewer, sectionId, courseId);
   await syncSectionCategories(prisma, courseId, sectionId);
-  const [categories, enrollments, criteria] = await Promise.all([
+  const [categories, enrollments, criteria, classwork] = await Promise.all([
     prisma.assessmentCategory.findMany({
       where: { courseId, sectionId },
-      include: { assessments: { orderBy: { createdAt: "asc" } }, courseAssessment: { select: { component: true } } },
+      include: {
+        assessments: { orderBy: { createdAt: "asc" }, include: { assignment: { select: { id: true, title: true } } } },
+        courseAssessment: { select: { component: true } },
+      },
     }),
     prisma.enrollment.findMany({
       where: { courseId, sectionId },
@@ -69,6 +78,14 @@ export async function getMarksSheet(viewer: Viewer, sectionId: number, courseId:
       orderBy: { student: { name: "asc" } },
     }),
     prisma.gradingCriteria.findUnique({ where: { courseId_sectionId: { courseId, sectionId } } }),
+    // Graded assignments in this offering's classroom that a marks item can be linked to.
+    offering.classroom
+      ? prisma.assignment.findMany({
+          where: { ...linkableAssignment, classroomId: offering.classroom.id },
+          select: { id: true, title: true, points: true, assessment: { select: { id: true } } },
+          orderBy: { createdAt: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
   const grades = (criteria?.grades as unknown as GradeRange[] | undefined) ?? DEFAULT_GRADES;
   const weights = weightsFor(categories);
@@ -83,8 +100,9 @@ export async function getMarksSheet(viewer: Viewer, sectionId: number, courseId:
       component: c.courseAssessment?.component ?? null,
       fromScheme: c.courseAssessmentId !== null,
       singleAssessment: Boolean(SINGLE_TITLE[c.type]),
-      assessments: c.assessments.map((a) => ({ id: a.id, title: a.title, totalMarks: a.totalMarks })),
+      assessments: c.assessments.map((a) => ({ id: a.id, title: a.title, totalMarks: a.totalMarks, assignment: a.assignment })),
     })),
+    classwork: classwork.map((a) => ({ id: a.id, title: a.title, points: a.points!, linked: a.assessment !== null })),
     students: enrollments.map((e) => {
       const obtainedBy = new Map(e.marks.map((m) => [m.assessmentId, m.obtained]));
       const items = assessments.map((a) => ({ categoryId: a.categoryId, obtained: obtainedBy.get(a.id) ?? null, total: a.totalMarks }));
@@ -117,9 +135,28 @@ async function loadAssessment(viewer: Viewer, assessmentId: number) {
   return assessment;
 }
 
-/** Adds the next item to a category ("Quiz 3"), or its single exam ("Mid Term"). */
-export async function createAssessment(viewer: Viewer, categoryId: number, totalMarks: number) {
+/** A published, graded, not-deleted assignment. */
+const linkableAssignment = {
+  deletedAt: null,
+  moderationStatus: ModerationStatus.ACTIVE,
+  status: { in: [AssignmentStatus.PUBLISHED, AssignmentStatus.CLOSED] },
+  points: { not: null },
+} satisfies Prisma.AssignmentWhereInput;
+
+/** The assignment to link: graded, in this offering's classroom, and not linked to another item. */
+async function assertLinkableAssignment(sectionId: number, courseId: number, assignmentId: string) {
+  const assignment = await prisma.assignment.findFirst({
+    where: { ...linkableAssignment, id: assignmentId, classroom: { sectionCourse: { sectionId, courseId } } },
+    select: { id: true, assessment: { select: { title: true } } },
+  });
+  if (!assignment) throw badRequest("Pick a published, graded assignment from this course's classroom.");
+  if (assignment.assessment) throw conflictError(`That assignment already feeds ${assignment.assessment.title}.`);
+}
+
+/** Adds the next item to a category ("Quiz 3"), or its single exam ("Mid Term"), optionally fed by an assignment. */
+export async function createAssessment(viewer: Viewer, categoryId: number, totalMarks: number, assignmentId?: string | null) {
   const category = await loadCategory(viewer, categoryId);
+  if (assignmentId) await assertLinkableAssignment(category.sectionId, category.courseId, assignmentId);
   const existing = await prisma.assessment.findMany({ where: { categoryId }, select: { title: true } });
   let title: string;
   if (SINGLE_TITLE[category.type]) {
@@ -131,11 +168,19 @@ export async function createAssessment(viewer: Viewer, categoryId: number, total
     const numbers = existing.map((a) => Number.parseInt(a.title.slice(prefix.length + 1), 10)).filter((n) => !Number.isNaN(n));
     title = `${prefix} ${numbers.length ? Math.max(...numbers) + 1 : 1}`;
   }
-  return prisma.assessment.create({ data: { categoryId, title, totalMarks } });
+  const created = await prisma.assessment.create({ data: { categoryId, title, totalMarks, assignmentId: assignmentId ?? null } });
+  if (assignmentId) await importAssignmentMarks(created.id);
+  return created;
 }
 
 export async function updateAssessment(viewer: Viewer, assessmentId: number, totalMarks: number) {
   const assessment = await loadAssessment(viewer, assessmentId);
+  if (assessment.assignmentId) {
+    // Linked marks are scaled from the assignment's grades, so re-scale them to the new total.
+    const updated = await prisma.assessment.update({ where: { id: assessment.id }, data: { totalMarks } });
+    await importAssignmentMarks(assessment.id);
+    return updated;
+  }
   const highest = await prisma.mark.aggregate({ where: { assessmentId }, _max: { obtained: true } });
   if (highest._max.obtained !== null && highest._max.obtained > totalMarks) {
     throw badRequest(`A student already has ${highest._max.obtained} marks - the total can't be lower than that.`);

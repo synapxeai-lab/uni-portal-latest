@@ -5,12 +5,13 @@ import { multipart } from "@/http/upload";
 import { parseInput, parseParams } from "@/http/validate";
 import { currentUser } from "@/middleware/auth";
 import { cached } from "@/lib/cache/tagged-cache";
-import { CacheTags, CacheTtl, invalidateAssignment } from "@/lib/cache/tags";
+import { CacheTags, CacheTtl, invalidateAssignment, invalidateUniversity } from "@/lib/cache/tags";
 import { extractUploadedFiles } from "@/lib/storage/extract-files";
 import type { SessionUser } from "@/auth/session";
 import { requireVisibleClassroom } from "@/features/classroom/classroom.routes";
 import { ClassroomServiceError } from "@/features/classroom/lib/errors";
 import { getCachedAssignment } from "@/features/classwork/classwork.routes";
+import { copyReturnedGrade } from "@/features/academics/lib/classwork-marks";
 
 import * as submissionService from "./services/submission-service";
 import {
@@ -244,6 +245,8 @@ submissionRouter.post("/submissions/:studentId/return", async (req, res) => {
     currentUser(req),
   );
   invalidateAssignment(classroomId, assignmentId);
+  // A returned grade also counts on the course marks sheet when the assignment is linked to a marks item.
+  if (await copyReturnedGrade(assignmentId, studentId)) invalidateUniversity();
   res.json({ status: "success", data: detail });
 });
 

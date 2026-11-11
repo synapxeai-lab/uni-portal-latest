@@ -29,8 +29,13 @@ marksRouter.get("/marks/:sectionId/:courseId", requireTeacherOrAdmin, async (req
 });
 
 marksRouter.post("/marks/categories/:categoryId/assessments", requireTeacherOrAdmin, async (req, res) => {
-  const { totalMarks } = parseInput(marks.totalMarksSchema, req.body);
-  const assessment = await marks.createAssessment(currentUser(req), intParam(req, "categoryId", "section ID"), totalMarks);
+  const { totalMarks, assignmentId } = parseInput(marks.createAssessmentSchema, req.body);
+  const assessment = await marks.createAssessment(
+    currentUser(req),
+    intParam(req, "categoryId", "section ID"),
+    totalMarks,
+    assignmentId,
+  );
   invalidateUniversity();
   done(res, { assessment, message: `${assessment.title} created.` }, 201);
 });
