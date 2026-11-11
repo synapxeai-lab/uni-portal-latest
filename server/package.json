@@ -14,7 +14,8 @@
     "seed": "prisma db seed",
     "latency": "tsx scripts/latency.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:import-legacy": "tsx scripts/import-legacy.ts"
   },
   "dependencies": {
     "@portal/shared": "*",
@@ -28,6 +29,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "pg": "^8.16.3",
     "prisma": "^7.8.0",
     "zod": "^4.4.3"
   },
@@ -38,6 +40,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.18.0",
+    "@types/pg": "^8.15.5",
     "esbuild": "^0.25.10",
     "tsx": "^4.20.6",
     "vitest": "^3.2.4",
