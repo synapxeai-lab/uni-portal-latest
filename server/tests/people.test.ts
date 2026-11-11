@@ -64,10 +64,14 @@ describe("people API", () => {
     expect(teacher.userId).toBeTruthy();
     expect(login.email).toBe(email);
 
-    // The new login works straight away.
+    // The new login works, but the generated password must be changed before anything else.
     const session = await new ApiSession().login(email, login.password);
-    const me = await session.get<{ user: { role: string; name: string } }>("/auth/session");
+    const me = await session.get<{ user: { role: string; name: string }; mustChangePassword: boolean }>("/auth/session");
     expect(me.data.user.role).toBe("TEACHER");
+    expect(me.data.mustChangePassword).toBe(true);
+    expect((await session.get("/dashboard")).status).toBe(403);
+    await session.firstLogin(email, login.password);
+    expect((await session.get("/dashboard")).status).toBe(200);
 
     // Renaming the profile renames the login.
     await admin.put(`/teachers/${teacher.id}`, { name: "Renamed Teacher" });

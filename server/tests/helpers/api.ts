@@ -77,6 +77,20 @@ export class ApiSession {
     }
     return this;
   }
+
+  /** Signs in with an admin-issued temporary password and sets a new one, as a new user must first. */
+  async firstLogin(email: string, temporaryPassword: string) {
+    await this.login(email, temporaryPassword);
+    const response = await this.post("/account/password", {
+      currentPassword: temporaryPassword,
+      newPassword: "Changed12345",
+      confirmPassword: "Changed12345",
+    });
+    if (response.status !== 200) {
+      throw new Error(`Password change failed for ${email}: ${JSON.stringify(response.body)}`);
+    }
+    return this;
+  }
 }
 
 export function signIn(role: keyof typeof ACCOUNTS): Promise<ApiSession> {

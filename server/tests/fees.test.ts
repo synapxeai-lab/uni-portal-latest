@@ -42,7 +42,7 @@ describe("fee challans", () => {
       guardianEmail: "g@example.com",
     });
     studentId = created.data.student.id;
-    student = await new ApiSession().login(created.data.login.email, created.data.login.password);
+    student = await new ApiSession().firstLogin(created.data.login.email, created.data.login.password);
     const page = await student.get<{ courses: { id: number; code: string; defaultSectionId: number }[] }>("/my/registration");
     const course = page.data.courses.find((c) => c.code === "DTM-TDW")!;
     courseId = course.id;

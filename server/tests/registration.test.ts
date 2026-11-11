@@ -71,7 +71,7 @@ describe("student registration", () => {
       guardianEmail: "g@example.com",
     });
     studentId = created.data.student.id;
-    student = await new ApiSession().login(created.data.login.email, created.data.login.password);
+    student = await new ApiSession().firstLogin(created.data.login.email, created.data.login.password);
   });
 
   afterAll(async () => {
@@ -162,7 +162,7 @@ describe("deleting a registered student", () => {
       guardianRelationship: "Father",
       guardianEmail: "g@example.com",
     });
-    const student = await new ApiSession().login(created.data.login.email, created.data.login.password);
+    const student = await new ApiSession().firstLogin(created.data.login.email, created.data.login.password);
     const page = (await student.get<MyRegistration>("/my/registration")).data;
     const course = page.courses[0];
     await student.post("/my/registration", { courseId: course.id, sectionId: course.defaultSectionId });

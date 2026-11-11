@@ -47,6 +47,8 @@ export async function ensureLoginFor(
       role,
       status: UserStatus.ACTIVE,
       ...(await passwordFields(password)),
+      // A generated password: the teacher or student sets their own on first sign-in.
+      mustChangePassword: true,
     },
   });
   return { userId: user.id, login: { email: profile.email, password } };
