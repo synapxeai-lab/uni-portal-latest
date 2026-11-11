@@ -5,10 +5,13 @@ import {
   BookOpen,
   Calendar,
   CalendarClock,
+  CalendarRange,
   CalendarX,
   ClipboardCheck,
   ClipboardList,
+  GraduationCap,
   LayoutGrid,
+  Library,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -23,6 +26,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Roles that can see this item. Omit to show it to everyone. */
   roles?: UserRole[];
+  /** Other path prefixes that belong to this item (header title, active state). */
+  matches?: string[];
   /** Show a red dot while the user has unread notifications. */
   showUnreadDot?: boolean;
 }
@@ -64,6 +69,26 @@ export const navSections: NavSection[] = [
       },
       { label: "Classes", href: "/classes", icon: BookOpen },
       { label: "Archived classes", href: "/archived", icon: Archive },
+    ],
+  },
+  {
+    label: "University",
+    items: [
+      {
+        label: "Programmes",
+        href: "/admin/programmes",
+        icon: GraduationCap,
+        roles: [UserRole.ADMIN],
+        matches: ["/admin/diplomas"],
+      },
+      { label: "Courses", href: "/admin/courses", icon: Library, roles: [UserRole.ADMIN] },
+      {
+        label: "Batches",
+        href: "/admin/batches",
+        icon: CalendarRange,
+        roles: [UserRole.ADMIN],
+        matches: ["/admin/sections"],
+      },
     ],
   },
   {
@@ -124,7 +149,11 @@ const EXTRA_PAGE_TITLES: Record<string, string> = {
 export function getPageTitle(pathname: string, sections: NavSection[]): string | null {
   const match = sections
     .flatMap((section) => section.items)
-    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .filter((item) =>
+      [item.href, ...(item.matches ?? [])].some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+      ),
+    )
     .sort((a, b) => b.href.length - a.href.length)[0];
 
   return match?.label ?? EXTRA_PAGE_TITLES[pathname] ?? null;

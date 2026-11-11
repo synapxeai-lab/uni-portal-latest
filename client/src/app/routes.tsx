@@ -34,6 +34,14 @@ const ClassworkPage = lazy(() => import("@/pages/classes/classwork-page"));
 const AssignmentPage = lazy(() => import("@/pages/classes/assignment-page"));
 const SubmissionsPage = lazy(() => import("@/pages/classes/submissions-page"));
 const SubmissionReviewPage = lazy(() => import("@/pages/classes/submission-review-page"));
+const ProgrammesPage = lazy(() => import("@/pages/university/programmes-page"));
+const ProgrammePage = lazy(() => import("@/pages/university/programme-page"));
+const DiplomaPage = lazy(() => import("@/pages/university/diploma-page"));
+const CoursesPage = lazy(() => import("@/pages/university/courses-page"));
+const CoursePage = lazy(() => import("@/pages/university/course-page"));
+const BatchesPage = lazy(() => import("@/pages/university/batches-page"));
+const BatchPage = lazy(() => import("@/pages/university/batch-page"));
+const SectionPage = lazy(() => import("@/pages/university/section-page"));
 
 export function AppRoutes() {
   return (
@@ -81,6 +89,14 @@ export function AppRoutes() {
           <Route path="classrooms" element={<AdminClassroomsPage />} />
           <Route path="timetable" element={<AdminTimetablePage />} />
           <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+          <Route path="programmes" element={<ProgrammesPage />} />
+          <Route path="programmes/:slug" element={<ProgrammePage />} />
+          <Route path="diplomas/:id" element={<DiplomaPage />} />
+          <Route path="courses" element={<CoursesPage />} />
+          <Route path="courses/:id" element={<CoursePage />} />
+          <Route path="batches" element={<BatchesPage />} />
+          <Route path="batches/:batch" element={<BatchPage />} />
+          <Route path="sections/:id" element={<SectionPage />} />
           <Route path="settings" element={<Navigate to="/settings#platform" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

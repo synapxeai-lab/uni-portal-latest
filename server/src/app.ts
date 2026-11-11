@@ -31,6 +31,7 @@ import { accountRouter } from "@/features/account/account.routes";
 import { avatarRouter } from "@/features/account/avatar.routes";
 import { authRouter } from "@/features/auth/auth.routes";
 import { notificationRouter } from "@/features/notifications/notification.routes";
+import { structureRouter } from "@/features/academics/structure.routes";
 
 export function createApp() {
   const app = express();
@@ -80,6 +81,7 @@ export function createApp() {
   api.use("/calendar", calendarRouter);
   api.use("/timetable", timetableRouter);
   api.use("/search", searchRouter);
+  api.use(structureRouter);
   api.use("/admin/settings", requireAdmin, settingsRouter);
   api.use("/admin", requireAdmin, adminRouter);
 

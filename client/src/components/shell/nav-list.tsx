@@ -20,10 +20,15 @@ export function NavList({ sections, collapsed = false, onNavigate }: NavListProp
   // Only the most specific matching link is active - otherwise a parent route
   // like /admin would light up alongside /admin/users.
   const matchesPath = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // An item also owns its `matches` prefixes (Programmes owns /admin/diplomas).
   const activeHref = sections
-    .flatMap((section) => section.items.map((item) => item.href))
-    .filter(matchesPath)
-    .sort((a, b) => b.length - a.length)[0];
+    .flatMap((section) =>
+      section.items.flatMap((item) =>
+        [item.href, ...(item.matches ?? [])].map((prefix) => ({ prefix, href: item.href })),
+      ),
+    )
+    .filter(({ prefix }) => matchesPath(prefix))
+    .sort((a, b) => b.prefix.length - a.prefix.length)[0]?.href;
 
   return (
     <nav aria-label="Primary" className="flex flex-col gap-1 px-3 pb-6 pt-[18px]">

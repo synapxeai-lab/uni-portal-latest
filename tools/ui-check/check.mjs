@@ -47,6 +47,14 @@ const DEFAULT_PAGES = {
     "/admin/classrooms",
     "/admin/audit-logs",
     "/admin/timetable",
+    "/admin/programmes",
+    "/admin/programmes/{programmeSlug}",
+    "/admin/diplomas/{departmentId}",
+    "/admin/courses",
+    "/admin/courses/{courseId}",
+    "/admin/batches",
+    "/admin/batches/{batch}",
+    "/admin/sections/{sectionId}",
     "/change-password",
   ],
   teacher: [
@@ -142,6 +150,26 @@ for (const role of roles) {
         ids,
       );
       ids.studentId = submissions.overview?.rows?.[0]?.studentId ?? "none";
+    }
+    if (role === "admin") {
+      // University records for the admin pages: the first diploma with a section.
+      const uni = await page.evaluate(async () => {
+        const get = (url) => fetch(url).then((r) => r.json());
+        const [{ categories }, { departments }] = await Promise.all([
+          get("/api/programme-categories"),
+          get("/api/departments"),
+        ]);
+        const department = departments.find((d) => d.sections.length && d.courses.length) ?? departments[0];
+        const section = department?.sections[0];
+        return {
+          programmeSlug: categories.find((c) => c.key === department?.category)?.slug ?? "none",
+          departmentId: department?.id ?? "none",
+          courseId: department?.courses[0]?.id ?? "none",
+          sectionId: section?.id ?? "none",
+          batch: section ? encodeURIComponent(section.batch) : "none",
+        };
+      });
+      Object.assign(ids, uni);
     }
     mkdirSync(`out/${role}/${viewportName}`, { recursive: true });
 

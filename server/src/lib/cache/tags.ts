@@ -22,6 +22,9 @@ export const CacheTags = {
   ADMIN: "admin",
   TIMETABLE: "timetable",
   SETTINGS: "settings",
+  // University administration: programmes, diplomas, courses, batches,
+  // sections, people, registration, attendance, marks and fees.
+  UNIVERSITY: "university",
   classroom: (classroomId: string) => `classroom:${classroomId}`,
   assignment: (assignmentId: string) => `assignment:${assignmentId}`,
   user: (userId: string) => `user:${userId}`,
@@ -80,4 +83,13 @@ export function invalidateSettings(): void {
 /** Session/profile data of one user changed (status, role, avatar, password). */
 export function invalidateUser(...userIds: string[]): void {
   cache.invalidateTags(...userIds.map((id) => CacheTags.user(id)));
+}
+
+/**
+ * A change to the university's academic records (structure, people,
+ * offerings, registration, attendance, marks, fees). Dashboards and admin
+ * listings read these too.
+ */
+export function invalidateUniversity(): void {
+  cache.invalidateTags(CacheTags.UNIVERSITY, CacheTags.AGGREGATES, CacheTags.ADMIN);
 }

@@ -27,6 +27,9 @@ interface Context {
   classroomId?: string;
   assignmentId?: string;
   studentId?: string;
+  departmentId?: number;
+  courseId?: number;
+  sectionId?: number;
 }
 
 /** The Calendar page's request for the current month (ranges as the browser computes them). */
@@ -75,6 +78,17 @@ function endpointsFor(role: Role, ctx: Context): string[] {
       : []),
     calendarPath(),
     ...(role === "admin" ? ["/timetable/clashes"] : []),
+    "/programme-categories",
+    "/batches",
+    ...(role === "admin"
+      ? [
+          "/departments",
+          "/courses",
+          ...(ctx.departmentId ? [`/departments/${ctx.departmentId}`] : []),
+          ...(ctx.courseId ? [`/courses/${ctx.courseId}`] : []),
+          ...(ctx.sectionId ? [`/sections/${ctx.sectionId}`] : []),
+        ]
+      : []),
   ];
   if (ctx.classroomId) {
     endpoints.push(
@@ -168,6 +182,16 @@ for (const role of Object.keys(ACCOUNTS) as Role[]) {
       `/classrooms/${classroomId}/assignments/${ctx.assignmentId}/submissions`,
     );
     ctx.studentId = submissions.overview?.rows[0]?.studentId;
+  }
+
+  if (role === "admin") {
+    const { departments } = await getJson<{
+      departments: { id: number; sections: { id: number }[]; courses: { id: number }[] }[];
+    }>("/departments");
+    const department = departments.find((d) => d.sections.length && d.courses.length) ?? departments[0];
+    ctx.departmentId = department?.id;
+    ctx.courseId = department?.courses[0]?.id;
+    ctx.sectionId = department?.sections[0]?.id;
   }
 
   for (const path of endpointsFor(role, ctx)) {
