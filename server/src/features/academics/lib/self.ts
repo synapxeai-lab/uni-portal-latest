@@ -31,3 +31,27 @@ export async function getSelfTeacher(userId: string) {
   }
   return teacher;
 }
+
+/**
+ * The offering (course in a section), checked that the user may teach it: an
+ * admin, or the teacher assigned to it. Used by attendance, marks and grades.
+ */
+export async function assertTeachesOffering(
+  user: { id: string; role: string },
+  sectionId: number,
+  courseId: number,
+) {
+  const offering = await prisma.sectionCourse.findUnique({
+    where: { sectionId_courseId: { sectionId, courseId } },
+    include: {
+      teacher: { select: { userId: true, name: true } },
+      course: { select: { id: true, code: true, name: true, creditHours: true } },
+      section: { select: { id: true, label: true, batch: true, department: { select: { code: true, name: true } } } },
+      classroom: { select: { id: true } },
+    },
+  });
+  if (!offering || (user.role !== "ADMIN" && offering.teacher?.userId !== user.id)) {
+    throw new HttpError(404, "You are not assigned to teach this section.", "NOT_FOUND");
+  }
+  return offering;
+}

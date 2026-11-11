@@ -25,6 +25,7 @@ type Role = keyof typeof ACCOUNTS;
 
 interface Context {
   classroomId?: string;
+  offering?: { courseId: number; sectionId: number } | null;
   assignmentId?: string;
   studentId?: string;
   departmentId?: number;
@@ -82,7 +83,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     "/programme-categories",
     "/batches",
     "/registrations/current",
-    ...(role === "student" ? ["/my/registration", "/my/courses"] : []),
+    ...(role === "student" ? ["/my/registration", "/my/courses", "/my/attendance"] : []),
     ...(role === "admin"
       ? [
           "/departments",
@@ -95,11 +96,15 @@ function endpointsFor(role: Role, ctx: Context): string[] {
           "/offerings",
           "/assignments",
           "/registrations",
+          "/attendance",
           ...(ctx.departmentId ? [`/offerings/${ctx.departmentId}/2026`] : []),
           ...(ctx.academicStudentId ? [`/students/${ctx.academicStudentId}`] : []),
         ]
       : []),
   ];
+  if (ctx.offering && role !== "student") {
+    endpoints.push(`/attendance/${ctx.offering.sectionId}/${ctx.offering.courseId}`);
+  }
   if (ctx.classroomId) {
     endpoints.push(
       `/classrooms/${ctx.classroomId}`,
@@ -179,14 +184,15 @@ for (const role of Object.keys(ACCOUNTS) as Role[]) {
   const getJson = async <T>(path: string): Promise<T> =>
     (await fetch(`${BASE}${path}`, { headers: { Cookie: cookie } })).json() as Promise<T>;
   // The seeded class every demo account belongs to, and its first assignment.
-  const classrooms = await getJson<{ id: string; title: string }[]>("/classrooms");
-  const classroomId = (
-    classrooms.find((c) => c.title === "Advanced Mathematics 101") ?? classrooms[0]
-  )?.id;
+  const classrooms = await getJson<
+    { id: string; title: string; offering: { courseId: number; sectionId: number } | null }[]
+  >("/classrooms");
+  const classroom = classrooms.find((c) => c.title === "Advanced Mathematics 101") ?? classrooms[0];
+  const classroomId = classroom?.id;
   const classwork = classroomId
     ? await getJson<{ assignments: { id: string }[] }>(`/classrooms/${classroomId}/classwork`)
     : { assignments: [] };
-  const ctx: Context = { classroomId, assignmentId: classwork.assignments[0]?.id };
+  const ctx: Context = { classroomId, assignmentId: classwork.assignments[0]?.id, offering: classroom?.offering };
   if (role === "teacher" && ctx.assignmentId) {
     const submissions = await getJson<{ overview?: { rows: { studentId: string }[] } }>(
       `/classrooms/${classroomId}/assignments/${ctx.assignmentId}/submissions`,

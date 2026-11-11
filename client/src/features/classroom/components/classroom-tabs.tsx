@@ -9,12 +9,16 @@ const TABS = [
   { label: "People", segment: "people" },
 ] as const;
 
-export function ClassroomTabs({ classroomId }: { classroomId: string }) {
+// Only on the classroom of a university course offering.
+const OFFERING_TABS = [{ label: "Attendance", segment: "attendance" }] as const;
+
+export function ClassroomTabs({ classroomId, isOffering = false }: { classroomId: string; isOffering?: boolean }) {
   const pathname = usePathname();
+  const tabs = isOffering ? [...TABS, ...OFFERING_TABS] : TABS;
 
   return (
     <nav aria-label="Classroom" className="flex gap-1 overflow-x-auto border-b border-border">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const href = `/classes/${classroomId}/${tab.segment}`;
         const isActive = pathname === href || pathname.startsWith(`${href}/`);
 

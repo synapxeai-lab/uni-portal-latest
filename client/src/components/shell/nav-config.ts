@@ -7,6 +7,7 @@ import {
   BookOpen,
   Calendar,
   CalendarClock,
+  CalendarCheck,
   CalendarPlus,
   CalendarRange,
   CalendarX,
@@ -83,6 +84,7 @@ export const navSections: NavSection[] = [
     items: [
       { label: "My courses", href: "/my-courses", icon: BookMarked, roles: [UserRole.STUDENT] },
       { label: "Registration", href: "/registration", icon: NotebookPen, roles: [UserRole.STUDENT] },
+      { label: "Attendance", href: "/my-attendance", icon: CalendarCheck, roles: [UserRole.STUDENT] },
     ],
   },
   {
@@ -112,6 +114,7 @@ export const navSections: NavSection[] = [
         roles: [UserRole.ADMIN],
       },
       { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
+      { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck, roles: [UserRole.ADMIN] },
       {
         label: "Assign teachers",
         href: "/admin/assign-teachers",

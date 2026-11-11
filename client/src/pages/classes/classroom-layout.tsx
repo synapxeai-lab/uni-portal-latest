@@ -64,7 +64,7 @@ export default function ClassroomLayout() {
         <div className="flex flex-col">
           <ClassroomHeader classroom={data} />
           <PageContainer className="gap-4">
-            <ClassroomTabs classroomId={data.id} />
+            <ClassroomTabs classroomId={data.id} isOffering={data.offering !== null} />
             <Suspense fallback={<ClassroomTabLoading />}>
               <Outlet context={data} />
             </Suspense>
