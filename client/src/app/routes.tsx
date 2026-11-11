@@ -54,6 +54,10 @@ const MyCoursesPage = lazy(() => import("@/pages/university/my-courses-page"));
 const ClassroomAttendancePage = lazy(() => import("@/pages/classes/attendance-page"));
 const AttendanceOverviewPage = lazy(() => import("@/pages/university/attendance-overview-page"));
 const MyAttendancePage = lazy(() => import("@/pages/university/my-attendance-page"));
+const ClassroomMarksPage = lazy(() => import("@/pages/classes/marks-page"));
+const GradesPage = lazy(() => import("@/pages/university/grades-page"));
+const MyMarksPage = lazy(() => import("@/pages/university/my-marks-page"));
+const TranscriptPage = lazy(() => import("@/pages/university/transcript-page"));
 
 export function AppRoutes() {
   return (
@@ -73,9 +77,12 @@ export function AppRoutes() {
             <Route path="/my-courses" element={<MyCoursesPage />} />
             <Route path="/registration" element={<StudentRegistrationPage />} />
             <Route path="/my-attendance" element={<MyAttendancePage />} />
+            <Route path="/my-marks" element={<MyMarksPage />} />
+            <Route path="/transcript" element={<TranscriptPage />} />
           </Route>
           <Route element={<RoleRoute roles={[UserRole.TEACHER, UserRole.ADMIN]} denied="review" />}>
             <Route path="/review" element={<ReviewPage />} />
+            <Route path="/grades" element={<GradesPage />} />
           </Route>
           <Route path="/classes" element={<ClassesPage />} />
           <Route path="/classes/:classroomId" element={<ClassroomLayout />}>
@@ -90,6 +97,7 @@ export function AppRoutes() {
             />
             <Route path="people" element={<PeoplePage />} />
             <Route path="attendance" element={<ClassroomAttendancePage />} />
+            <Route path="marks" element={<ClassroomMarksPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           <Route path="/archived" element={<ArchivedClassesPage />} />
@@ -123,6 +131,7 @@ export function AppRoutes() {
           <Route path="assign-teachers" element={<AssignTeachersPage />} />
           <Route path="registration" element={<RegistrationsPage />} />
           <Route path="attendance" element={<AttendanceOverviewPage />} />
+          <Route path="grades" element={<GradesPage />} />
           <Route path="settings" element={<Navigate to="/settings#platform" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

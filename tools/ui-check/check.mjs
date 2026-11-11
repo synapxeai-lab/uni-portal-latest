@@ -39,6 +39,7 @@ const COMMON_PAGES = [
   "/classes/{classroomId}/classwork",
   "/classes/{classroomId}/classwork/{assignmentId}",
   "/classes/{classroomId}/attendance",
+  "/classes/{classroomId}/marks",
 ];
 const DEFAULT_PAGES = {
   admin: [
@@ -64,6 +65,7 @@ const DEFAULT_PAGES = {
     "/admin/assign-teachers",
     "/admin/registration",
     "/admin/attendance",
+    "/admin/grades",
     "/change-password",
   ],
   teacher: [
@@ -71,9 +73,10 @@ const DEFAULT_PAGES = {
     "/review",
     "/classes/{classroomId}/classwork/{assignmentId}/submissions",
     "/classes/{classroomId}/classwork/{assignmentId}/submissions/{studentId}",
+    "/grades",
     "/change-password",
   ],
-  student: [...COMMON_PAGES, "/todo", "/my-courses", "/registration", "/my-attendance"],
+  student: [...COMMON_PAGES, "/todo", "/my-courses", "/registration", "/my-attendance", "/my-marks", "/transcript"],
 };
 
 const VIEWPORTS = {

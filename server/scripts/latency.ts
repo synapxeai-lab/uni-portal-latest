@@ -83,7 +83,9 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     "/programme-categories",
     "/batches",
     "/registrations/current",
-    ...(role === "student" ? ["/my/registration", "/my/courses", "/my/attendance"] : []),
+    ...(role === "student"
+      ? ["/my/registration", "/my/courses", "/my/attendance", "/my/marks", "/my/transcript"]
+      : ["/grades"]),
     ...(role === "admin"
       ? [
           "/departments",
@@ -103,7 +105,10 @@ function endpointsFor(role: Role, ctx: Context): string[] {
       : []),
   ];
   if (ctx.offering && role !== "student") {
-    endpoints.push(`/attendance/${ctx.offering.sectionId}/${ctx.offering.courseId}`);
+    endpoints.push(
+      `/attendance/${ctx.offering.sectionId}/${ctx.offering.courseId}`,
+      `/marks/${ctx.offering.sectionId}/${ctx.offering.courseId}`,
+    );
   }
   if (ctx.classroomId) {
     endpoints.push(

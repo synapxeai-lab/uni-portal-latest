@@ -14,6 +14,7 @@ import { AdminLoading } from "@/app/layouts";
 import { QueryView } from "@/app/route-states";
 import { universityAction, useCourse, useDepartments } from "@/features/academics/api";
 import { CopyCourseDialog, CourseDialog, ExtraFeeDialog } from "@/features/academics/components/structure-dialogs";
+import { SchemeDialog } from "@/features/academics/components/scheme-dialog";
 import { Fact, formatRs, ordinal, runAction, TableCard } from "@/features/academics/components/ui";
 import type { ExtraFee } from "@/features/academics/types";
 
@@ -24,6 +25,7 @@ export default function CoursePage() {
   const departments = useDepartments().data?.departments ?? [];
   const [editing, setEditing] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [editingScheme, setEditingScheme] = useState(false);
   const [feeDialog, setFeeDialog] = useState<ExtraFee | "new" | null>(null);
 
   return (
@@ -101,13 +103,16 @@ export default function CoursePage() {
             </Card>
 
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Assessment scheme</CardTitle>
+                <Button size="sm" variant="outline" onClick={() => setEditingScheme(true)}>
+                  <Pencil /> Edit
+                </Button>
               </CardHeader>
               <CardContent>
                 {course.assessmentScheme.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No scheme yet. It's set up with marks, and decides how each assessment counts towards the grade.
+                    No scheme yet. It decides which assessments teachers mark and how much each counts.
                   </p>
                 ) : (
                   <ul className="flex flex-col divide-y divide-border">
@@ -170,6 +175,7 @@ export default function CoursePage() {
             )}
           </div>
 
+          <SchemeDialog open={editingScheme} onOpenChange={setEditingScheme} course={course} />
           <CourseDialog open={editing} onOpenChange={setEditing} course={course} departments={departments} />
           {copying ? <CopyCourseDialog open onOpenChange={setCopying} course={course} departments={departments} /> : null}
           <ExtraFeeDialog

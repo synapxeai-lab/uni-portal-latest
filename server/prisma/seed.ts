@@ -17,6 +17,7 @@ import { seedPeople } from "./seed/people";
 import { seedOfferings } from "./seed/offerings";
 import { seedRegistration } from "./seed/registration";
 import { seedAttendance } from "./seed/attendance";
+import { seedMarks } from "./seed/marks";
 
 async function main() {
   await seedPlatform(prisma);
@@ -31,6 +32,7 @@ async function main() {
   const registration = await seedRegistration(prisma);
   console.log(`Registration ${registration.registration}: ${registration.enrolled} enrollments`);
   console.log(`Attendance: ${await seedAttendance(prisma)} records`);
+  console.log(`Marks: ${await seedMarks(prisma)} entered`);
 }
 
 main()

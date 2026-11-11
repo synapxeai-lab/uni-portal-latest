@@ -36,6 +36,7 @@ import { peopleRouter } from "@/features/academics/people.routes";
 import { offeringsRouter } from "@/features/academics/offerings.routes";
 import { registrationRouter } from "@/features/academics/registration.routes";
 import { attendanceRouter } from "@/features/academics/attendance.routes";
+import { marksRouter } from "@/features/academics/marks.routes";
 
 export function createApp() {
   const app = express();
@@ -90,6 +91,7 @@ export function createApp() {
   api.use(offeringsRouter);
   api.use(registrationRouter);
   api.use(attendanceRouter);
+  api.use(marksRouter);
   api.use("/admin/settings", requireAdmin, settingsRouter);
   api.use("/admin", requireAdmin, adminRouter);
 

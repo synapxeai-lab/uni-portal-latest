@@ -10,7 +10,10 @@ const TABS = [
 ] as const;
 
 // Only on the classroom of a university course offering.
-const OFFERING_TABS = [{ label: "Attendance", segment: "attendance" }] as const;
+const OFFERING_TABS = [
+  { label: "Attendance", segment: "attendance" },
+  { label: "Marks", segment: "marks" },
+] as const;
 
 export function ClassroomTabs({ classroomId, isOffering = false }: { classroomId: string; isOffering?: boolean }) {
   const pathname = usePathname();

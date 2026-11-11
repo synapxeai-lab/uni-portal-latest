@@ -1,11 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Archive,
+  Award,
   Backpack,
+  BookCheck,
   BookMarked,
   Bell,
   BookOpen,
   Calendar,
+  FileText,
   CalendarClock,
   CalendarCheck,
   CalendarPlus,
@@ -75,6 +78,7 @@ export const navSections: NavSection[] = [
         icon: ClipboardList,
         roles: [UserRole.TEACHER, UserRole.ADMIN],
       },
+      { label: "Grades", href: "/grades", icon: Award, roles: [UserRole.TEACHER] },
       { label: "Classes", href: "/classes", icon: BookOpen },
       { label: "Archived classes", href: "/archived", icon: Archive },
     ],
@@ -85,6 +89,8 @@ export const navSections: NavSection[] = [
       { label: "My courses", href: "/my-courses", icon: BookMarked, roles: [UserRole.STUDENT] },
       { label: "Registration", href: "/registration", icon: NotebookPen, roles: [UserRole.STUDENT] },
       { label: "Attendance", href: "/my-attendance", icon: CalendarCheck, roles: [UserRole.STUDENT] },
+      { label: "Marks", href: "/my-marks", icon: BookCheck, roles: [UserRole.STUDENT] },
+      { label: "Transcript", href: "/transcript", icon: FileText, roles: [UserRole.STUDENT] },
     ],
   },
   {
@@ -115,6 +121,7 @@ export const navSections: NavSection[] = [
       },
       { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
       { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck, roles: [UserRole.ADMIN] },
+      { label: "Grades", href: "/admin/grades", icon: Award, roles: [UserRole.ADMIN] },
       {
         label: "Assign teachers",
         href: "/admin/assign-teachers",
