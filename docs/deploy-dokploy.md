@@ -1,21 +1,17 @@
 # Deploying on Dokploy (Hostinger VPS)
 
-The portal runs as two containers from [`docker-compose.dokploy.yml`](../docker-compose.dokploy.yml):
+The portal runs as two Dokploy services in one project:
 
-- **db**: PostgreSQL 17;
-- **app**: the production image from the [`Dockerfile`](../Dockerfile). It serves the API and the built React app on port 4000 and applies database migrations every time it starts.
-
-Dokploy builds the image on the VPS from your Git repository. Its Traefik proxy serves your domain over HTTPS with a free Let's Encrypt certificate.
-
-**Uploaded files and the database** are stored in ordinary folders on the VPS disk. They sit outside Dokploy's checkout, so redeploying, rebuilding or deleting the service doesn't touch them:
-
-| Folder on the VPS | Mounted in | Holds |
+| Dokploy service | Type | What it is |
 | --- | --- | --- |
-| `/srv/eithm/uploads` | `app:/data/uploads` | every uploaded file (submissions, classwork attachments, avatars...) |
-| `/srv/eithm/postgres` | `db:/var/lib/postgresql/data` | the database |
-| `/srv/eithm/backups` | (none) | nightly backups from [`deploy/backup.sh`](../deploy/backup.sh) |
+| `portal-db` | **Database → PostgreSQL** | the database, with Dokploy's built-in backups |
+| `portal` | **Compose** ([`docker-compose.dokploy.yml`](../docker-compose.dokploy.yml)) | the app: one container serving the API and the built React app on port 4000; it applies database migrations every time it starts |
 
-> **About "Hostinger volumes":** Hostinger VPS plans come with one NVMe disk and no separate block-storage volumes to attach. Your persistent volume is therefore a folder on that disk, mounted into the container as shown above. To keep the data on a different disk later (for example an extra mounted drive), set `DATA_DIR` (step 6) to a folder on it and move the existing folders across.
+Dokploy builds the app image from your Git repository on the VPS. Its Traefik proxy serves your domain over HTTPS with a free Let's Encrypt certificate. The frontend and backend are one container on one domain, so you don't deploy them separately.
+
+**Uploaded files** are stored in a folder on the VPS disk, `/srv/eithm/uploads`, mounted into the app at `/data/uploads`. The folder sits outside Dokploy's checkout, so redeploying, rebuilding or deleting the service doesn't touch it. The database's data lives in the Docker volume that Dokploy manages for `portal-db`.
+
+> **About "Hostinger volumes":** Hostinger VPS plans come with one NVMe disk and no separate block-storage volumes to attach. Your persistent volume is therefore a folder on that disk, mounted into the container as shown above. To keep uploads on a different disk later, set `DATA_DIR` (step 8) to a folder on it and move `uploads/` across.
 
 ---
 
@@ -34,11 +30,11 @@ Dokploy builds the image on the VPS from your Git repository. Its Traefik proxy 
 1. Open `http://<VPS-IP>:3000` and create the Dokploy admin account.
 2. Recommended: in **Settings → Web Server**, give the dashboard its own domain (for example `dokploy.yourdomain.com`, which needs its own A record) with HTTPS. Then close port 3000 in the firewall.
 
-## 3. Prepare the data folders (SSH)
+## 3. Prepare the uploads folder (SSH)
 
 ```bash
 ssh root@<VPS-IP>
-mkdir -p /srv/eithm/uploads /srv/eithm/postgres /srv/eithm/backups
+mkdir -p /srv/eithm/uploads /srv/eithm/backups
 chown 1000:1000 /srv/eithm/uploads      # the app runs as uid 1000 ("node")
 ```
 
@@ -48,48 +44,77 @@ You don't strictly need this step: the compose file's `storage-init` service cre
 
 The repository is most likely private. In Dokploy, open **Settings → Git → GitHub → Create GitHub App**, follow the prompts, and install the app on the repository. GitLab, Bitbucket and Gitea work the same way.
 
-## 5. Create the service
+Push this repository, including `docker-compose.dokploy.yml`, to the branch you'll deploy (`main`).
 
-1. **Projects → Create Project**, for example `EITHM`.
-2. Inside it, **Create Service → Compose**. Name it `portal`.
-3. On the **General** tab:
+## 5. Create the project
+
+**Projects → Create Project**, for example `EITHM`.
+
+## 6. Create the database service
+
+1. Inside the project, **Create Service → Database → PostgreSQL**.
+2. Fill in:
+
+   | Field | Value |
+   | --- | --- |
+   | Name | `portal-db` |
+   | Database Name | `portal` |
+   | Database User | `portal` |
+   | Database Password | leave the generated one, or generate one with `openssl rand -hex 24` |
+   | Docker Image | `postgres:17` |
+
+3. Click **Create**, then **Deploy** on the database's page.
+4. Leave **External Port** empty, so the database isn't exposed to the internet.
+5. On the database's **General** tab, copy the **Internal Connection URL**. It looks like this:
+   ```
+   postgresql://portal:<password>@eithm-portaldb-abc123:5432/portal
+   ```
+   You'll need it in step 8.
+
+## 7. Create the app service
+
+1. In the same project, **Create Service → Compose**. Name it `portal` and leave **Compose Type** as **Docker Compose**.
+2. On the **General** tab:
    - **Provider:** GitHub. Pick the repository and branch `main`.
    - **Compose Path:** `./docker-compose.dokploy.yml`
-   - **Compose Type:** Docker Compose
    - Click **Save**.
 
-## 6. Environment variables
+## 8. Environment variables (app service)
 
-Generate the secrets on the VPS (or anywhere you have `openssl`):
+Generate the JWT secret:
 
 ```bash
-openssl rand -hex 24   # -> POSTGRES_PASSWORD
-openssl rand -hex 32   # -> JWT_SECRET
+openssl rand -hex 32
 ```
 
-On the service's **Environment** tab, paste the following and click **Save**:
+On the `portal` service's **Environment** tab, paste the following and click **Save**:
 
 ```env
-POSTGRES_PASSWORD=<first value>
-JWT_SECRET=<second value>
-# Optional - base folder for uploads/ and postgres/ (default /srv/eithm)
+DATABASE_URL=<Internal Connection URL from step 6>?schema=public
+JWT_SECRET=<the openssl value>
+# Optional - base folder for uploads/ on the VPS (default /srv/eithm)
 # DATA_DIR=/srv/eithm
 # Optional - encrypts the admin-viewable password copies (default: JWT_SECRET).
 # If you import the legacy University Portal, set this to its old key.
 # PASSWORD_ENC_KEY=
 ```
 
-Keep these values in a password manager. **Don't change them later:**
+For example:
 
-- `POSTGRES_PASSWORD` is only applied when the database is first created. Changing it afterwards breaks the app's connection.
+```env
+DATABASE_URL=postgresql://portal:9f3c...@eithm-portaldb-abc123:5432/portal?schema=public
+```
+
+Keep `JWT_SECRET` in a password manager. **Don't change it later:**
+
 - Changing `JWT_SECRET` signs everyone out.
 - Changing `PASSWORD_ENC_KEY` (or `JWT_SECRET`, if you never set `PASSWORD_ENC_KEY`) makes the admin-viewable passwords unreadable.
 
-Use hex values for `POSTGRES_PASSWORD`. It goes into a connection URL, so characters like `@ / : #` would break it.
+If the database password contains any of `@ / : # ? %`, URL-encode it in `DATABASE_URL` (for example `@` becomes `%40`). A hex password avoids this.
 
-## 7. Domain and HTTPS
+## 9. Domain and HTTPS
 
-On the **Domains** tab, click **Add Domain**:
+On the `portal` service's **Domains** tab, click **Add Domain**:
 
 | Field | Value |
 | --- | --- |
@@ -102,46 +127,48 @@ On the **Domains** tab, click **Add Domain**:
 
 HTTPS is required. The session cookie is `Secure` in production, so over plain http the login appears to succeed and then drops you back on the sign-in page.
 
-## 8. Deploy
+## 10. Deploy
 
-Click **Deploy** and follow the **Deployments** log. The first build takes several minutes. When it finishes:
+Make sure `portal-db` is running, then click **Deploy** on `portal` and follow the **Deployments** log. The first build takes several minutes. When it finishes:
 
-- **Logs** (service `app`) shows the Prisma migrations, then `API listening on http://localhost:4000`;
+- **Logs** (container `app`) shows the Prisma migrations creating the tables, then `API listening on http://localhost:4000`;
 - `https://portal.yourdomain.com/api/health` returns `{"ok":true}`;
 - the certificate can take a minute after the first deploy. Until then the browser shows a certificate warning.
 
-## 9. Create the first admin
+## 11. Create the first admin
 
-The demo seed isn't part of production. Create your own admin account instead, either in the app container's terminal in Dokploy (**Docker** tab of the service → `app` container → **Terminal**, shell `sh`) or over SSH:
-
-```bash
-# over SSH: find the app container
-docker ps --filter label=com.docker.compose.service=app --format '{{.Names}}'
-
-docker exec -it \
-  -e ADMIN_EMAIL='admin@eithm.edu.pk' \
-  -e ADMIN_PASSWORD='a-strong-password' \
-  -e ADMIN_NAME='Portal Administrator' \
-  <app-container> node dist/create-admin.js
-```
-
-In the Dokploy terminal you're already inside the container. Run:
+The demo seed isn't part of production. Create your own admin account instead. Open the `portal` service's **Docker** tab, choose the `app` container, then **Terminal** with shell `sh`, and run:
 
 ```sh
-ADMIN_EMAIL='admin@eithm.edu.pk' ADMIN_PASSWORD='a-strong-password' node dist/create-admin.js
+ADMIN_EMAIL='admin@eithm.edu.pk' ADMIN_PASSWORD='a-strong-password' ADMIN_NAME='Portal Administrator' node dist/create-admin.js
+```
+
+You can do the same over SSH:
+
+```bash
+docker exec -it \
+  -e ADMIN_EMAIL='admin@eithm.edu.pk' -e ADMIN_PASSWORD='a-strong-password' \
+  $(docker ps -qf label=com.docker.compose.service=app) node dist/create-admin.js
 ```
 
 Then sign in at `https://portal.yourdomain.com`. Running the command again with the same email resets that account's password and unlocks it. Use this if you're ever locked out.
 
-## 10. Automatic deploys (optional)
+## 12. Automatic deploys (optional)
 
-On the **General** tab, turn on **Autodeploy**. Every push to `main` then rebuilds and redeploys the app. Migrations run automatically on start, and uploads and the database stay where they are.
+On the `portal` **General** tab, turn on **Autodeploy**. Every push to `main` then rebuilds and redeploys the app. Migrations run automatically on start, and the uploads and the database stay where they are.
 
 ---
 
 ## Backups
 
-Copy the backup script to the VPS once and schedule it nightly:
+### Database: Dokploy
+
+1. **Settings → S3 Destinations → Add**. Use any S3-compatible bucket: Cloudflare R2, Backblaze B2, AWS S3, or MinIO.
+2. Open `portal-db`, go to its **Backups** tab and click **Create Backup**.
+3. Choose the destination, database `portal`, and a schedule such as `0 2 * * *` (daily at 02:00). Turn it on.
+4. Click **Test** or run it once manually to check that it works.
+
+### Uploads: cron script
 
 ```bash
 # from your computer, in the project folder
@@ -157,19 +184,25 @@ crontab -e                               # add the line below
 30 2 * * * /srv/eithm/backup.sh >> /srv/eithm/backups/backup.log 2>&1
 ```
 
-Each run writes `db_<date>.dump` and `uploads_<date>.tar.gz` to `/srv/eithm/backups` and deletes backups older than 14 days (`KEEP_DAYS`). These copies are on the same disk, so also copy them off the server regularly, for example with `scp`/`rsync` to your computer or a cloud bucket. Hostinger's VPS snapshots and weekly backups (hPanel → VPS → Backups) are a good extra layer.
+Each run writes `uploads_<date>.tar.gz` to `/srv/eithm/backups` and deletes archives older than 14 days (`KEEP_DAYS`). These archives are on the same disk, so also copy them off the server regularly, for example with `rsync` to your computer or the same S3 bucket. Hostinger's VPS snapshots and weekly backups (hPanel → VPS → Backups) are a good extra layer.
 
 ### Restoring
 
-```bash
-DB=$(docker ps --filter label=com.docker.compose.service=db --format '{{.Names}}' | head -n1)
-# Stop the "app" service in Dokploy first (keep "db" running), then:
-docker exec -i "$DB" pg_restore -U portal -d portal --clean --if-exists --no-owner \
-  < /srv/eithm/backups/db_<date>.dump
-tar -xzf /srv/eithm/backups/uploads_<date>.tar.gz -C /srv/eithm
-chown -R 1000:1000 /srv/eithm/uploads
-# Start/redeploy in Dokploy.
-```
+- **Database:** on the `portal-db` **Backups** tab, use **Restore** on the backup you want. Stop the `portal` service first.
+- **Uploads:**
+  ```bash
+  tar -xzf /srv/eithm/backups/uploads_<date>.tar.gz -C /srv/eithm
+  chown -R 1000:1000 /srv/eithm/uploads
+  ```
+
+## Working with the database
+
+- **SQL shell:** in `portal-db`, open the **Docker** tab, then **Terminal**, and run `psql -U portal -d portal`.
+- **pgAdmin or DBeaver from your PC:** the safest option is an SSH tunnel. Find the database container's IP on the VPS with
+  ```bash
+  docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' <portal-db container>
+  ```
+  then run `ssh -L 5433:<that-ip>:5432 root@<VPS-IP>` and connect to `localhost:5433`. You could instead set an **External Port** on `portal-db`, but that exposes the database to the internet, so only do it with a strong password and a firewall rule limited to your IP.
 
 ## Moving existing data in (optional)
 
@@ -182,17 +215,27 @@ scp portal.dump root@<VPS-IP>:/srv/eithm/backups/
 scp -r server/storage/uploads/. root@<VPS-IP>:/srv/eithm/uploads/
 ```
 
-Then, on the VPS, restore it as described in **Restoring** above, using `portal.dump` and skipping the `tar` line. Finish with `chown -R 1000:1000 /srv/eithm/uploads`. If the legacy University Portal passwords should stay viewable, set `PASSWORD_ENC_KEY` (step 6) to the key you used for the import **before** users start changing passwords.
+Then on the VPS, with the `portal` service stopped in Dokploy:
+
+```bash
+DB=$(docker ps --format '{{.Names}}' | grep portaldb | head -n1)   # the portal-db container
+docker exec -i "$DB" pg_restore -U portal -d portal --clean --if-exists --no-owner \
+  < /srv/eithm/backups/portal.dump
+chown -R 1000:1000 /srv/eithm/uploads
+```
+
+Start the `portal` service again. If the legacy University Portal passwords should stay viewable, set `PASSWORD_ENC_KEY` (step 8) to the key you used for the import **before** users start changing passwords.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 | --- | --- |
-| Sign-in "works" but returns to the login page | The domain isn't on HTTPS (step 7), or you opened it through `http://`. |
+| App keeps restarting with `Can't reach database server` / `P1001` | Check that `portal-db` is running and that `DATABASE_URL` uses its **internal** host (step 6), not `localhost`. |
+| `P1000` authentication failed | The password in `DATABASE_URL` is wrong, or it has special characters that aren't URL-encoded. |
+| Sign-in "works" but returns to the login page | The domain isn't on HTTPS (step 9), or you opened it through `http://`. |
 | `404 page not found` / `Bad Gateway` on the domain | The domain must point to service **`app`** and port **`4000`**. Check that the app container is healthy in **Logs**. |
 | Uploads fail with `EACCES` in the logs | `chown -R 1000:1000 /srv/eithm/uploads` |
 | Build is killed / `JavaScript heap out of memory` | The VPS is short of RAM. Add swap (`fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`, then add it to `/etc/fstab`) or move to a bigger plan. |
-| App restarts with `JWT_SECRET must be at least 32 characters` | Set `JWT_SECRET` in the Environment tab (step 6) and redeploy. |
-| App can't connect to the database after changing `POSTGRES_PASSWORD` | Change it back. The database keeps the password it was created with. |
+| App restarts with `JWT_SECRET must be at least 32 characters` | Set `JWT_SECRET` in the Environment tab (step 8) and redeploy. |
 
 Files up to 25 MB can be uploaded (`shared/src/files/validation.ts`). Traefik adds no lower limit.

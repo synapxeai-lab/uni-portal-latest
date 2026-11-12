@@ -1,40 +1,25 @@
-# Dokploy deployment (Hostinger VPS): PostgreSQL + the single app image (API +
-# built React app). Step-by-step guide: docs/deploy-dokploy.md
+# Dokploy deployment (Hostinger VPS): the single app image (API + built React
+# app). The database is a separate Dokploy "Database -> PostgreSQL" service.
+# Step-by-step guide: docs/deploy-dokploy.md
 #
 # In Dokploy: Create Service -> Compose, provider = this Git repo,
 # Compose Path = ./docker-compose.dokploy.yml. Set the variables below in the
 # service's Environment tab, then add the domain in the Domains tab
 # (service "app", port 4000, HTTPS on).
 #
-# Persistent data lives in plain folders on the VPS disk (bind mounts), outside
+# Uploaded files live in a plain folder on the VPS disk (bind mount), outside
 # Dokploy's checkout, so redeploys and rebuilds never touch it:
-#   ${DATA_DIR}/uploads   uploaded files     (default /srv/eithm/uploads)
-#   ${DATA_DIR}/postgres  database files     (default /srv/eithm/postgres)
+#   ${DATA_DIR}/uploads   (default /srv/eithm/uploads)
 #
 # Required variables:
-#   POSTGRES_PASSWORD  letters and digits only (it goes into a URL)
-#   JWT_SECRET         32+ random characters
+#   DATABASE_URL  the Dokploy database's "Internal Connection URL", with
+#                 ?schema=public appended
+#   JWT_SECRET    32+ random characters
 # Optional:
-#   DATA_DIR           base folder on the VPS (default /srv/eithm)
-#   PASSWORD_ENC_KEY   defaults to JWT_SECRET (see .env.example)
+#   DATA_DIR          base folder on the VPS (default /srv/eithm)
+#   PASSWORD_ENC_KEY  defaults to JWT_SECRET (see .env.example)
 
 services:
-  db:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: portal
-      POSTGRES_USER: portal
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy's Environment tab}
-    volumes:
-      - ${DATA_DIR:-/srv/eithm}/postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portal -d portal"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    # Not published to the internet - only the app reaches it.
-
   # One-shot: makes sure the uploads folder exists on the VPS and belongs to
   # the app's user (uid 1000, "node"), which can't write to a root-owned
   # folder. Exits immediately; "app" waits for it.
@@ -51,7 +36,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://portal:${POSTGRES_PASSWORD}@db:5432/portal?schema=public
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in Dokploy's Environment tab}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in Dokploy's Environment tab}
       PASSWORD_ENC_KEY: ${PASSWORD_ENC_KEY:-${JWT_SECRET}}
       # Set by the Dockerfile too; repeated here so the mount below is explicit.
@@ -63,8 +48,6 @@ services:
     volumes:
       - ${DATA_DIR:-/srv/eithm}/uploads:/data/uploads
     depends_on:
-      db:
-        condition: service_healthy
       storage-init:
         condition: service_completed_successfully
     healthcheck:
@@ -79,6 +62,7 @@ services:
       - dokploy-network
 
 networks:
-  # Dokploy's Traefik routes the domain to "app" over this network.
+  # Dokploy's network: Traefik routes the domain to "app" over it, and the
+  # separate Dokploy PostgreSQL service is reachable on it by its internal host.
   dokploy-network:
     external: true
