@@ -19,9 +19,9 @@
         function p() {
           try {
             var t = localStorage.getItem(k);
-            return t === "light" || t === "dark" ? t : "system";
+            return t === "light" || t === "dark" || t === "system" ? t : "light";
           } catch (e) {
-            return "system";
+            return "light";
           }
         }
         function a() {

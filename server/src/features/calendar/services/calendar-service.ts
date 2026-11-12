@@ -6,7 +6,7 @@ import { getRegisteredCalendarEventProviders } from "./calendar-providers";
 // Side-effect import - registers every built-in event provider (Phase 16.2).
 import "./providers";
 import { narrowScopeToClassroom } from "../lib/calendar-scope";
-import type { CalendarEvent, CalendarFilters } from "../types";
+import type { CalendarEvent, CalendarFilters, CalendarRange } from "../types";
 
 /**
  * The single entry point every calendar view (month/week/day) goes through.
@@ -60,6 +60,40 @@ export async function getEvents(
   }
 
   return events.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+/**
+ * getEvents for several ranges at once (the /calendar page's grid, today,
+ * upcoming and month agenda). The ranges almost always overlap - the month
+ * grid covers the other three - so they are merged and each merged span is
+ * fetched once, then split back per range in memory. That turns ~20 parallel
+ * queries into ~5. Every event is a point in time (start), so an event
+ * belongs to a range exactly when its start falls inside it, matching the
+ * providers' own `gte start, lte end` filters.
+ */
+export async function getEventsForRanges(
+  user: SessionUser,
+  scope: ClassroomSearchScope,
+  filters: Omit<CalendarFilters, "range">,
+  ranges: CalendarRange[],
+): Promise<CalendarEvent[][]> {
+  const merged: CalendarRange[] = [];
+  for (const range of [...ranges].sort((a, b) => a.start.getTime() - b.start.getTime())) {
+    const last = merged[merged.length - 1];
+    if (last && range.start.getTime() <= last.end.getTime() + 1) {
+      if (range.end > last.end) last.end = range.end;
+    } else {
+      merged.push({ start: range.start, end: range.end });
+    }
+  }
+
+  const fetched = (
+    await Promise.all(merged.map((range) => getEvents(user, scope, { ...filters, range })))
+  ).flat();
+
+  return ranges.map((range) =>
+    fetched.filter((event) => event.start >= range.start && event.start <= range.end),
+  );
 }
 
 export interface CalendarFilterOptions {

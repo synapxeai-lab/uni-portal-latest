@@ -24,8 +24,12 @@ export async function fetchStreamVersion(classroomId: string): Promise<string> {
   return body.version;
 }
 
-export async function markStreamNotificationsRead(classroomId: string): Promise<void> {
-  await api.post(`/classrooms/${classroomId}/stream/notifications/read`);
+/** Returns how many notifications were marked read. */
+export async function markStreamNotificationsRead(classroomId: string): Promise<number> {
+  const response = await api.post<{ count?: unknown }>(
+    `/classrooms/${classroomId}/stream/notifications/read`,
+  );
+  return typeof response.data.count === "number" ? response.data.count : 0;
 }
 
 // ---- Mutations (same signatures as the old Server Actions) -------------------

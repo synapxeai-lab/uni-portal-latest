@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
 import {
+  DEFAULT_THEME,
   THEME_CHANGE_EVENT,
   THEME_STORAGE_KEY,
   isThemePreference,
@@ -13,9 +14,9 @@ const DARK_QUERY = "(prefers-color-scheme: dark)";
 function readPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemePreference(stored) ? stored : "system";
+    return isThemePreference(stored) ? stored : DEFAULT_THEME;
   } catch {
-    return "system";
+    return DEFAULT_THEME;
   }
 }
 
@@ -37,7 +38,7 @@ function subscribe(onChange: () => void) {
 }
 
 export function useTheme() {
-  const preference = useSyncExternalStore(subscribe, readPreference, () => "system" as const);
+  const preference = useSyncExternalStore(subscribe, readPreference, () => DEFAULT_THEME);
   const resolvedTheme = useSyncExternalStore(
     subscribe,
     () => resolve(readPreference()),
@@ -46,8 +47,7 @@ export function useTheme() {
 
   const setTheme = useCallback((next: ThemePreference) => {
     try {
-      if (next === "system") localStorage.removeItem(THEME_STORAGE_KEY);
-      else localStorage.setItem(THEME_STORAGE_KEY, next);
+      localStorage.setItem(THEME_STORAGE_KEY, next);
     } catch {
       // Storage blocked (private mode) - still apply for this page view.
     }

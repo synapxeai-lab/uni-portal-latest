@@ -64,24 +64,14 @@ calendarRouter.get("/", async (req, res) => {
     { ttl: CacheTtl.LIVE, tags: [CacheTags.ACADEMIC, CacheTags.AGGREGATES] },
     async () => {
       const scope = await getClassroomSearchScope(user);
-      const [events, todayEvents, upcomingEvents, monthAgendaEvents, filterOptions] =
+      const [[events, todayEvents, upcomingEvents, monthAgendaEvents], filterOptions] =
         await Promise.all([
-          calendarService.getEvents(user, scope, {
-            ...baseFilters,
-            range: rangeOf(query.gridStart, query.gridEnd),
-          }),
-          calendarService.getEvents(user, scope, {
-            ...baseFilters,
-            range: rangeOf(query.todayStart, query.todayEnd),
-          }),
-          calendarService.getEvents(user, scope, {
-            ...baseFilters,
-            range: rangeOf(query.upcomingStart, query.upcomingEnd),
-          }),
-          calendarService.getEvents(user, scope, {
-            ...baseFilters,
-            range: rangeOf(query.monthStart, query.monthEnd),
-          }),
+          calendarService.getEventsForRanges(user, scope, baseFilters, [
+            rangeOf(query.gridStart, query.gridEnd),
+            rangeOf(query.todayStart, query.todayEnd),
+            rangeOf(query.upcomingStart, query.upcomingEnd),
+            rangeOf(query.monthStart, query.monthEnd),
+          ]),
           calendarService.getFilterOptions(scope),
         ]);
       return { events, todayEvents, upcomingEvents, monthAgendaEvents, filterOptions };

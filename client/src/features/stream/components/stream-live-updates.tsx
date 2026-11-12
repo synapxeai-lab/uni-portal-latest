@@ -63,9 +63,16 @@ export function StreamLiveUpdates({ classroomId }: { classroomId: string }) {
       return;
     }
 
+    // Adjust the bell locally by however many were cleared - no refetch.
     markStreamNotificationsRead(classroomId)
-      .catch((error: unknown) => console.error(error))
-      .finally(() => queryClient.invalidateQueries({ queryKey: UNREAD_COUNT_QUERY_KEY }));
+      .then((cleared) => {
+        if (cleared > 0) {
+          queryClient.setQueryData<number>(UNREAD_COUNT_QUERY_KEY, (previous) =>
+            Math.max(0, (previous ?? 0) - cleared),
+          );
+        }
+      })
+      .catch((error: unknown) => console.error(error));
     // dataUpdatedAt: re-run on every successful poll, not only when the version changes.
   }, [version, dataUpdatedAt, classroomId, queryClient]);
 
