@@ -10,8 +10,9 @@ const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 const external = Object.keys(pkg.dependencies).filter((name) => name !== "@portal/shared");
 
 await build({
-  entryPoints: ["src/index.ts"],
-  outfile: "dist/index.js",
+  // create-admin: creates the first admin in production (no tsx/seed there).
+  entryPoints: { index: "src/index.ts", "create-admin": "scripts/create-admin.ts" },
+  outdir: "dist",
   bundle: true,
   platform: "node",
   format: "esm",
@@ -24,4 +25,4 @@ await build({
   },
 });
 
-console.log("server built -> dist/index.js");
+console.log("server built -> dist/index.js, dist/create-admin.js");

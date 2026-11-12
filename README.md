@@ -172,6 +172,8 @@ docker compose -f docker-compose.prod.yml up --build      # app + PostgreSQL, ht
 
 Mount a persistent volume at `/data` for uploaded files. Run the scheduled-publish worker on one instance only (`SCHEDULED_PUBLISH_WORKER=false` on the others).
 
+To deploy on a VPS with Dokploy (for example Hostinger), see [docs/deploy-dokploy.md](docs/deploy-dokploy.md). It uses `docker-compose.dokploy.yml`, keeps uploads and the database in folders on the VPS disk, and adds `node dist/create-admin.js` for creating the first admin.
+
 ## History
 
 The project was built module by module, one commit each:
