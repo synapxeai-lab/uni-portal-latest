@@ -11,7 +11,8 @@ interface UseNotificationCenterOptions {
   initialCursor: string | null;
 }
 
-const PAGE_SIZE = 20;
+// The 10 most recent at a time; older ones load with "Load more".
+const PAGE_SIZE = 10;
 
 /**
  * Owns state for the full-page notification center: server-seeded initial

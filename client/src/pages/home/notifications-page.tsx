@@ -24,7 +24,7 @@ export default function NotificationsPage() {
   // read (staleTime 0) and the sidebar dot / bell badge clear immediately.
   const page = useQuery({
     queryKey: ["notifications", "page"],
-    queryFn: () => openNotifications({ limit: 20 }),
+    queryFn: () => openNotifications({ limit: 10 }),
     staleTime: 0,
   });
 

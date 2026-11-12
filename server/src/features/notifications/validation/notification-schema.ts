@@ -4,7 +4,7 @@ import { NotificationType } from "@/generated/prisma/enums";
 
 export const listNotificationsSchema = z.object({
   cursor: z.string().uuid("Invalid cursor.").optional(),
-  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(10),
   unreadOnly: z.coerce.boolean().optional().default(false),
   // Validated against the generated enum rather than a hand-listed set of
   // strings, so this can never drift out of sync with the schema (e.g. a new
