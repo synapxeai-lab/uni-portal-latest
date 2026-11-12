@@ -11,13 +11,14 @@ import type { SessionUser } from "@/auth/session";
 import { requireVisibleClassroom } from "@/features/classroom/classroom.routes";
 import { ClassroomServiceError } from "@/features/classroom/lib/errors";
 import { getCachedAssignment } from "@/features/classwork/classwork.routes";
-import { copyReturnedGrade } from "@/features/academics/lib/classwork-marks";
+import { syncClassworkMark } from "@/features/academics/lib/classwork-marks";
 
 import * as submissionService from "./services/submission-service";
 import {
   classroomAssignmentIdSchema,
   deletePrivateCommentSchema,
   gradeInputSchema,
+  returnInputSchema,
   privateCommentSchema,
   removeAttachmentSchema,
   studentSubmissionIdSchema,
@@ -236,17 +237,22 @@ submissionRouter.delete("/submissions/:studentId/comments/:commentId", async (re
 
 // ---- Teacher: grading -------------------------------------------------------------------
 
+// Returns work to the student for revision (not graded); any grade is cleared.
 submissionRouter.post("/submissions/:studentId/return", async (req, res) => {
-  const { classroomId, assignmentId, studentId } = studentIdsOf(req);
+  const { classroomId, assignmentId, studentId, note } = parseInput(returnInputSchema, {
+    ...studentIdsOf(req),
+    note: req.body?.note,
+  });
   const detail = await submissionService.returnSubmission(
     classroomId,
     assignmentId,
     studentId,
     currentUser(req),
+    note,
   );
   invalidateAssignment(classroomId, assignmentId);
-  // A returned grade also counts on the course marks sheet when the assignment is linked to a marks item.
-  if (await copyReturnedGrade(assignmentId, studentId)) invalidateUniversity();
+  // Work out for revision has no grade, so it no longer counts on a linked marks item.
+  if (await syncClassworkMark(assignmentId, studentId)) invalidateUniversity();
   res.json({ status: "success", data: detail });
 });
 
@@ -264,5 +270,7 @@ submissionRouter.put("/submissions/:studentId/grade", async (req, res) => {
     { grade: input.grade, feedback: input.feedback },
   );
   invalidateAssignment(input.classroomId, input.assignmentId);
+  // Grading is final: it counts on the course marks sheet when the assignment is linked to a marks item.
+  if (await syncClassworkMark(input.assignmentId, input.studentId)) invalidateUniversity();
   res.json({ status: "success", data: detail });
 });

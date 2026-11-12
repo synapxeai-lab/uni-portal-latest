@@ -7,7 +7,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateTimeText } from "@/components/ui/date-time-text";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +22,7 @@ import { usePendingAction } from "@/hooks/use-pending-action";
 import { formatDuration } from "@/lib/datetime/format";
 import { getInitials } from "@/lib/utils";
 
-import { gradeSubmissionAction, returnGradedSubmissionAction, updateGradeAction } from "../api";
+import { gradeSubmissionAction, returnForRevisionAction, updateGradeAction } from "../api";
 import { isLateSubmission, toDisplayStatus } from "../lib/display-status";
 import { formatGrade } from "../lib/format-grade";
 import type { SubmissionReviewDetail } from "../types";
@@ -65,16 +72,18 @@ export function SubmissionReviewPanel({
     },
     (data) => {
       applyDetail(data);
-      toast.success("Grade saved");
+      toast.success(hasExistingGrade ? "Grade updated - the student sees the new grade" : "Graded - the student can see it now");
     },
   );
 
+  const [returnNote, setReturnNote] = useState("");
   const returnSubmission = usePendingAction(
-    () => returnGradedSubmissionAction(classroomId, assignmentId, studentId),
+    () => returnForRevisionAction(classroomId, assignmentId, studentId, returnNote.trim() || undefined),
     (data) => {
       applyDetail(data);
       setReturnConfirmOpen(false);
-      toast.success("Submission returned");
+      setReturnNote("");
+      toast.success("Returned for revision");
     },
   );
 
@@ -125,9 +134,10 @@ export function SubmissionReviewPanel({
                   : " - on time"}
               </span>
             ) : null}
-            {submission?.returnedAt ? (
+            {submission?.status === "RETURNED" && submission.returnedAt ? (
               <span>
-                Returned <DateTimeText value={submission.returnedAt} />
+                Returned for revision <DateTimeText value={submission.returnedAt} /> - waiting for the student to
+                turn it in again
               </span>
             ) : null}
           </div>
@@ -151,11 +161,12 @@ export function SubmissionReviewPanel({
               {detail.canReturn ? (
                 <Button
                   type="button"
+                  variant="outline"
                   className="w-fit"
                   onClick={() => setReturnConfirmOpen(true)}
                   disabled={returnSubmission.isPending}
                 >
-                  {returnSubmission.isPending ? "Returning…" : "Return"}
+                  {returnSubmission.isPending ? "Returning…" : "Return for revision"}
                 </Button>
               ) : null}
             </>
@@ -166,19 +177,39 @@ export function SubmissionReviewPanel({
           )}
         </CardContent>
 
-        <ConfirmDialog
-          open={returnConfirmOpen}
-          onOpenChange={setReturnConfirmOpen}
-          title="Return this submission?"
-          description={
-            detail.submission?.grade !== null && detail.submission?.grade !== undefined
-              ? `${detail.student.name} will see their grade (${formatGrade(detail.submission.grade, maxPoints)}) and feedback. The grade is locked unless they revise and resubmit.`
-              : `${detail.student.name} will see their work marked as returned. No grade has been entered.`
-          }
-          confirmLabel="Return"
-          pending={returnSubmission.isPending}
-          onConfirm={returnSubmission.run}
-        />
+        <Dialog open={returnConfirmOpen} onOpenChange={setReturnConfirmOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Return for revision?</DialogTitle>
+              <DialogDescription>
+                {detail.student.name} will have to improve this work and turn it in again.
+                {hasExistingGrade
+                  ? ` Their current grade (${formatGrade(detail.submission!.grade!, maxPoints)}) is removed until you grade the new version.`
+                  : " It isn't graded until then."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="return-note">What should they improve?</Label>
+              <Textarea
+                id="return-note"
+                value={returnNote}
+                onChange={(event) => setReturnNote(event.target.value)}
+                rows={4}
+                maxLength={5000}
+                placeholder="e.g. Add a follow-up step and keep it under 150 words."
+                disabled={returnSubmission.isPending}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReturnConfirmOpen(false)} disabled={returnSubmission.isPending}>
+                Cancel
+              </Button>
+              <Button onClick={returnSubmission.run} disabled={returnSubmission.isPending}>
+                {returnSubmission.isPending ? "Returning…" : "Return for revision"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Card>
 
       {detail.submission && maxPoints !== null ? (
@@ -233,11 +264,22 @@ export function SubmissionReviewPanel({
                       ? "Update grade"
                       : "Save grade"}
                 </Button>
+                <p className="text-xs text-muted-foreground">
+                  Grading is final: the student sees the grade and feedback straight away. Use “Return for revision”
+                  instead if the work needs improving.
+                </p>
               </>
             ) : (
-              <p className="whitespace-pre-wrap text-sm text-foreground">
-                {detail.submission.feedback || "No feedback given."}
-              </p>
+              <div className="flex flex-col gap-1">
+                {detail.submission.status === "RETURNED" ? (
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Your note to the student
+                  </span>
+                ) : null}
+                <p className="whitespace-pre-wrap text-sm text-foreground">
+                  {detail.submission.feedback || "No feedback given."}
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

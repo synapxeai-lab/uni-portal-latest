@@ -14,8 +14,8 @@ import type { TodoAssignmentItem, TodoFilters } from "../types";
 
 const VISIBLE_STATUSES: AssignmentStatus[] = [AssignmentStatus.PUBLISHED, AssignmentStatus.CLOSED];
 
-/** A submission counts as "done" the moment it's actually been turned in - ASSIGNED (an in-progress draft, never turned in) does not, everything past it does, including a late one. */
-const SUBMITTED_STATUSES: SubmissionStatus[] = ["SUBMITTED", "LATE", "REVIEWED", "RETURNED"];
+/** A submission counts as "done" once turned in (late or graded included). A draft does not, and nor does work the teacher returned for revision - the student has to turn it in again. */
+const SUBMITTED_STATUSES: SubmissionStatus[] = ["SUBMITTED", "LATE", "REVIEWED"];
 
 /**
  * The Student To-do board: every assignment the signed-in user can currently
@@ -84,11 +84,15 @@ export async function getStudentTodoItems(
     //   overdue one is).
     // - Assigned: everything else - not turned in, still open, and either
     //   has no due date or one that hasn't passed yet.
+    // Work returned for revision is to do again, even past the due date (it can still be turned in).
+    const isRevising = submission?.status === "RETURNED";
     const category: TodoAssignmentItem["category"] = isSubmitted
       ? "done"
-      : isOverdue || isClosed
-        ? "missing"
-        : "assigned";
+      : isRevising && !isClosed
+        ? "assigned"
+        : isOverdue || isClosed
+          ? "missing"
+          : "assigned";
 
     const wasLate = isLateSubmission(submission?.submittedAt ?? null, assignment.dueDate);
 
@@ -129,7 +133,11 @@ export async function countStudentMissingAssignments(
       classroomId: { in: classroomIds },
       deletedAt: null,
       status: { in: VISIBLE_STATUSES },
-      OR: [{ status: AssignmentStatus.CLOSED }, { dueDate: { lt: new Date() } }],
+      OR: [
+        { status: AssignmentStatus.CLOSED },
+        // Past due, unless it's out for revision (that's still to do, not missing).
+        { dueDate: { lt: new Date() }, submissions: { none: { studentId, deletedAt: null, status: "RETURNED" } } },
+      ],
       submissions: {
         none: { studentId, deletedAt: null, status: { in: SUBMITTED_STATUSES } },
       },

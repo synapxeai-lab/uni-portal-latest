@@ -235,26 +235,40 @@ export async function notifyMaterialPublished(params: {
   }
 }
 
-/** Fires exactly once, at return time - never at grade-entry time. A grade
- * stays invisible to the student until the submission is returned (see
- * submission-service.ts), so notifying earlier would leak that a grade
- * exists before the student is allowed to see it. The message is tailored
- * based on whether a grade was actually set, which covers both the
- * "submission returned" and "assignment graded" events with one call site. */
+/** Fires when a teacher saves a grade - grading is final and the student sees it straight away. */
+export async function notifySubmissionGraded(params: {
+  studentId: string;
+  classroomId: string;
+  assignmentId: string;
+  assignmentTitle: string;
+  regraded: boolean;
+}): Promise<void> {
+  try {
+    await createNotificationsForRecipients([params.studentId], {
+      type: NotificationType.SUBMISSION_RETURNED,
+      title: params.regraded ? "Your grade was updated" : "Your assignment was graded",
+      message: params.regraded
+        ? `Your grade for "${params.assignmentTitle}" was changed.`
+        : `"${params.assignmentTitle}" was graded.`,
+      link: `/classes/${params.classroomId}/classwork/${params.assignmentId}`,
+    });
+  } catch (error) {
+    console.error("notifySubmissionGraded failed:", error);
+  }
+}
+
+/** Fires when a teacher returns work for revision: the student has to improve it and turn it in again. */
 export async function notifySubmissionReturned(params: {
   studentId: string;
   classroomId: string;
   assignmentId: string;
   assignmentTitle: string;
-  isGraded: boolean;
 }): Promise<void> {
   try {
     await createNotificationsForRecipients([params.studentId], {
       type: NotificationType.SUBMISSION_RETURNED,
-      title: params.isGraded ? "Your assignment was graded" : "Your work was returned",
-      message: params.isGraded
-        ? `"${params.assignmentTitle}" was graded and returned.`
-        : `"${params.assignmentTitle}" was returned by your teacher.`,
+      title: "Your work needs revision",
+      message: `Your teacher returned "${params.assignmentTitle}" - revise it and turn it in again.`,
       // The assignment detail page is where a student sees both their
       // submission and (once returned) their grade and feedback - there's no
       // separate "my submission" route to link to instead.

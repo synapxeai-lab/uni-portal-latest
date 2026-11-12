@@ -180,13 +180,16 @@ export function SubmissionPanel({
 
   const isBusy = saveDraft.isPending || submit.isPending;
   const submission = view.submission;
+  // RETURNED: the teacher sent it back for revision. REVIEWED: graded (final).
   const isReturned = submission?.status === "RETURNED";
+  const isGraded = submission?.status === "REVIEWED";
   // The server decides the lock (closed, archived, past due with late work
   // off) and enforces it on every mutation; the live timer only flips the
   // past-due lock the moment the deadline passes while the page is open.
+  // Work returned for revision can be turned in again after the due date.
   const lockReason =
     view.lockReason ??
-    (archived ? "ARCHIVED" : isPastDue && !allowLateSubmission ? "PAST_DUE" : null);
+    (archived ? "ARCHIVED" : isPastDue && !allowLateSubmission && !isReturned ? "PAST_DUE" : null);
   const effectiveCanEdit = view.canEdit && lockReason === null;
   const effectiveCanUnsubmit = view.canUnsubmit && lockReason === null;
   const displayStatus = toDisplayStatus(submission?.status ?? null, {
@@ -209,9 +212,9 @@ export function SubmissionPanel({
                 <DateTimeText value={dueDate} variant="due" />
               </span>
             ) : null}
-            {submission?.returnedAt ? (
+            {isReturned && submission?.returnedAt ? (
               <span>
-                Returned <DateTimeText value={submission.returnedAt} />
+                Returned for revision <DateTimeText value={submission.returnedAt} />
               </span>
             ) : null}
             {submission?.submittedAt ? (
@@ -225,6 +228,17 @@ export function SubmissionPanel({
               </span>
             ) : null}
           </div>
+
+          {isReturned ? (
+            <div className="flex flex-col gap-1 rounded-md border border-gold/40 bg-accent px-3 py-2 text-sm">
+              <span className="font-semibold text-foreground">
+                Your teacher returned this for revision - improve it and turn it in again.
+              </span>
+              {submission?.feedback ? (
+                <span className="whitespace-pre-wrap text-foreground">{submission.feedback}</span>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Work already turned in isn't affected by the deadline, so only say so when it matters. */}
           {lockReason &&
@@ -316,7 +330,7 @@ export function SubmissionPanel({
                   onClick={() => setUnsubmitConfirmOpen(true)}
                   disabled={unsubmit.isPending}
                 >
-                  {unsubmit.isPending ? "Unsubmitting…" : isReturned ? "Revise and resubmit" : "Unsubmit"}
+                  {unsubmit.isPending ? "Unsubmitting…" : "Unsubmit"}
                 </Button>
               ) : null}
             </>
@@ -328,9 +342,11 @@ export function SubmissionPanel({
           onOpenChange={setSubmitConfirmOpen}
           title="Turn in this assignment?"
           description={
-            allowLateSubmission
-              ? "Your teacher will be able to see your response and attachments. You can unsubmit later to make changes until the assignment is closed - work turned in again after the due date is marked Late."
-              : "Your teacher will be able to see your response and attachments. You can unsubmit later to make changes until the due date."
+            isReturned
+              ? "Your teacher will review your revised work and grade it."
+              : allowLateSubmission
+                ? "Your teacher will be able to see your response and attachments. Until it's graded you can unsubmit to make changes - work turned in again after the due date is marked Late."
+                : "Your teacher will be able to see your response and attachments. Until it's graded you can unsubmit to make changes before the due date."
           }
           confirmLabel="Turn in"
           pending={submit.isPending}
@@ -340,19 +356,15 @@ export function SubmissionPanel({
         <ConfirmDialog
           open={unsubmitConfirmOpen}
           onOpenChange={setUnsubmitConfirmOpen}
-          title={isReturned ? "Revise your returned work?" : "Unsubmit this assignment?"}
-          description={
-            isReturned
-              ? "Your work goes back to draft so you can improve it. Your grade is hidden until you turn it in again and your teacher returns it with a new grade."
-              : "Your work will go back to draft so you can make changes. Remember to turn it in again before the due date."
-          }
-          confirmLabel={isReturned ? "Revise" : "Unsubmit"}
+          title="Unsubmit this assignment?"
+          description="Your work will go back to draft so you can make changes. Remember to turn it in again before the due date."
+          confirmLabel="Unsubmit"
           pending={unsubmit.isPending}
           onConfirm={unsubmit.run}
         />
       </Card>
 
-      {isReturned && maxPoints !== null ? (
+      {isGraded && maxPoints !== null ? (
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle>Grade</CardTitle>

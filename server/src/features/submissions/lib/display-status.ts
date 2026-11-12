@@ -1,13 +1,13 @@
 import type { SubmissionStatus } from "@/generated/prisma/enums";
 
 /**
- * A 6-bucket presentational status shared by the student panel, the teacher's
+ * A 7-bucket presentational status shared by the student panel, the teacher's
  * submission list, the review page, and To-do - collapses "no row yet" and
  * the raw SubmissionStatus enum into one consistent vocabulary so every
  * surface labels things identically.
  */
 export type SubmissionDisplayStatus =
-  "NOT_SUBMITTED" | "MISSING" | "DRAFT" | "SUBMITTED" | "LATE" | "RETURNED";
+  "NOT_SUBMITTED" | "MISSING" | "DRAFT" | "SUBMITTED" | "LATE" | "GRADED" | "RETURNED";
 
 /** True when work was turned in after the due date - the single definition of "late". */
 export function isLateSubmission(submittedAt: Date | null, dueDate: Date | null): boolean {
@@ -15,10 +15,10 @@ export function isLateSubmission(submittedAt: Date | null, dueDate: Date | null)
 }
 
 /**
- * `wasLate` (see isLateSubmission) decides Submitted vs. Late for every
- * turned-in state, so a due date moved after the fact, or grading in progress
- * (REVIEWED, which must read exactly like its pre-grading state), never
- * changes the label on its own. `missing` marks work that isn't turned in
+ * `wasLate` (see isLateSubmission) decides Submitted vs. Late for turned-in,
+ * ungraded work, so a due date moved after the fact never changes the label
+ * on its own. REVIEWED is graded work (final, and visible to the student);
+ * RETURNED is work the teacher sent back for the student to revise. `missing` marks work that isn't turned in
  * and no longer can be on time (past due, or the assignment was closed).
  */
 export function toDisplayStatus(
@@ -28,8 +28,9 @@ export function toDisplayStatus(
   switch (status) {
     case "SUBMITTED":
     case "LATE":
-    case "REVIEWED":
       return (options?.wasLate ?? status === "LATE") ? "LATE" : "SUBMITTED";
+    case "REVIEWED":
+      return "GRADED";
     case "RETURNED":
       return "RETURNED";
     case "ASSIGNED":
@@ -48,7 +49,8 @@ export const SUBMISSION_DISPLAY_STATUS_LABEL: Record<SubmissionDisplayStatus, st
   DRAFT: "Draft",
   SUBMITTED: "Submitted",
   LATE: "Late",
-  RETURNED: "Returned",
+  GRADED: "Graded",
+  RETURNED: "Returned for revision",
 };
 
 export const SUBMISSION_DISPLAY_STATUS_BADGE_VARIANT: Record<
@@ -60,5 +62,6 @@ export const SUBMISSION_DISPLAY_STATUS_BADGE_VARIANT: Record<
   DRAFT: "outline",
   SUBMITTED: "success",
   LATE: "destructive",
+  GRADED: "success",
   RETURNED: "secondary",
 };

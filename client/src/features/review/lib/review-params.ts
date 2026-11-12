@@ -3,7 +3,7 @@ import type { ReviewDisplayStatus, ReviewQueueFilters, ReviewSortKey } from "../
 export type RawSearchParams = Record<string, string | string[] | undefined>;
 
 const SORT_KEYS: ReviewSortKey[] = ["newest", "oldest", "dueDate", "studentName", "assignmentName"];
-const STATUS_VALUES: ReviewDisplayStatus[] = ["SUBMITTED", "LATE", "RETURNED"];
+const STATUS_VALUES: ReviewDisplayStatus[] = ["SUBMITTED", "LATE", "GRADED", "RETURNED"];
 
 function getStringParam(searchParams: RawSearchParams, key: string): string | undefined {
   const value = searchParams[key];

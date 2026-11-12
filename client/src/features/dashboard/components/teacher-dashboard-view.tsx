@@ -54,7 +54,7 @@ export function TeacherDashboardView({ data }: { data: TeacherDashboardData }) {
       <StatCard
         compact
         tone="success"
-        label="Returned today"
+        label="Returned for revision today"
         value={reviewSummary.returnedToday}
         icon={CheckCircle2}
         href="/review?status=RETURNED"

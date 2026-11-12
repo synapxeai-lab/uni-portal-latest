@@ -7,6 +7,7 @@ import { canManageClassroom } from "@/features/classroom/lib/can-manage";
 import { ClassroomServiceError } from "@/features/classroom/lib/errors";
 import {
   notifyPrivateComment,
+  notifySubmissionGraded,
   notifySubmissionReturned,
 } from "@/features/notifications/services/notification-generator";
 import { getFileAttachmentsByEntityIds, type AttachedFileSummary } from "@/lib/file-attachments";
@@ -106,15 +107,46 @@ function getLockReason(assignment: AssignmentContext): LockReason {
   return null;
 }
 
-/** Turned-in states a student may pull back to a draft (and so resubmit, e.g. after it's returned). */
-const UNSUBMITTABLE_STATUSES: SubmissionStatus[] = [
+/**
+ * Turned-in work a student may pull back to a draft: only while it's waiting
+ * to be graded. Graded work (REVIEWED) is final; work returned for revision
+ * (RETURNED) is already editable without unsubmitting.
+ */
+const UNSUBMITTABLE_STATUSES: SubmissionStatus[] = [SubmissionStatus.SUBMITTED, SubmissionStatus.LATE];
+
+/** Work a teacher can grade (or regrade) or return for revision. */
+const GRADABLE_STATUSES: SubmissionStatus[] = [
   SubmissionStatus.SUBMITTED,
   SubmissionStatus.LATE,
   SubmissionStatus.REVIEWED,
-  SubmissionStatus.RETURNED,
 ];
 
-function assertAssignmentAcceptsWork(assignment: AssignmentContext): void {
+/** States in which the student is working on their submission: a draft, or work returned for revision. */
+const EDITABLE_STATUSES: SubmissionStatus[] = [SubmissionStatus.ASSIGNED, SubmissionStatus.RETURNED];
+
+/**
+ * The lock for one student's work. Work the teacher returned for revision can
+ * be resubmitted after the due date (the teacher asked for it), so only an
+ * archived class or a closed assignment locks it.
+ */
+function getLockReasonFor(assignment: AssignmentContext, status: SubmissionStatus | null): LockReason {
+  const reason = getLockReason(assignment);
+  return reason === "PAST_DUE" && status === SubmissionStatus.RETURNED ? null : reason;
+}
+
+function assertAssignmentAcceptsWork(assignment: AssignmentContext, status: SubmissionStatus | null = null): void {
+  if (status === SubmissionStatus.RETURNED) {
+    // Revising returned work: only an archived class or a closed assignment stops it.
+    assertClassroomActive(assignment.classroom, "This class is archived and no longer accepts submissions.");
+    if (assignment.status === AssignmentStatus.CLOSED) {
+      throw new ClassroomServiceError(
+        "VALIDATION_ERROR",
+        "This assignment has been closed and no longer accepts submissions.",
+      );
+    }
+    return;
+  }
+
   assertClassroomActive(
     assignment.classroom,
     "This class is archived and no longer accepts submissions.",
@@ -180,7 +212,7 @@ async function writeOverDraft(
 ): Promise<SubmissionRow> {
   if (existing) {
     const { count } = await tx.submission.updateMany({
-      where: { id: existing.id, status: SubmissionStatus.ASSIGNED },
+      where: { id: existing.id, status: { in: EDITABLE_STATUSES } },
       data,
     });
     if (count === 0) {
@@ -219,22 +251,22 @@ function toSubmissionView(
   assignment: AssignmentContext,
   attachments: AttachedFileSummary[],
 ): SubmissionView {
-  const lockReason = getLockReason(assignment);
-
   if (!submission) {
+    const lockReason = getLockReason(assignment);
     return { submission: null, canEdit: lockReason === null, canUnsubmit: false, lockReason };
   }
 
-  const canEdit = submission.status === SubmissionStatus.ASSIGNED && lockReason === null;
+  const lockReason = getLockReasonFor(assignment, submission.status);
+  const canEdit = EDITABLE_STATUSES.includes(submission.status) && lockReason === null;
   // Unsubmitting past the due date is fine while late work is accepted - the
   // resubmission is simply marked Late. When it isn't, the lock applies, so a
   // student can't pull back work they'd then be unable to turn in again.
   const canUnsubmit = UNSUBMITTABLE_STATUSES.includes(submission.status) && lockReason === null;
 
-  // Grading is invisible to the student until the teacher actually returns
-  // the work - the columns may already hold a value while REVIEWED (grading
-  // in progress), but that must never leak to the student early.
-  const isReturned = submission.status === SubmissionStatus.RETURNED;
+  // Saving a grade is final, so the student sees it straight away. Work
+  // returned for revision has no grade, but the teacher's note says what to fix.
+  const isGraded = submission.status === SubmissionStatus.REVIEWED;
+  const hasFeedback = isGraded || submission.status === SubmissionStatus.RETURNED;
 
   return {
     submission: {
@@ -244,9 +276,9 @@ function toSubmissionView(
       submittedAt: submission.submittedAt,
       updatedAt: submission.updatedAt,
       returnedAt: submission.returnedAt,
-      grade: isReturned ? submission.grade : null,
-      feedback: isReturned ? submission.feedback : null,
-      gradedAt: isReturned ? submission.gradedAt : null,
+      grade: isGraded ? submission.grade : null,
+      feedback: hasFeedback ? submission.feedback : null,
+      gradedAt: isGraded ? submission.gradedAt : null,
       attachments,
     },
     canEdit,
@@ -289,14 +321,16 @@ export async function createOrUpdateSubmission(
 ): Promise<SubmissionView> {
   const assignment = await loadAssignmentContext(assignmentId);
   await assertStudentEligibility(assignment.classroomId, user);
-  assertAssignmentAcceptsWork(assignment);
 
   const existing = await findSubmissionByAssignmentAndStudent(assignmentId, user.id);
+  assertAssignmentAcceptsWork(assignment, existing?.status ?? null);
 
-  if (existing && existing.status !== SubmissionStatus.ASSIGNED) {
+  if (existing && !EDITABLE_STATUSES.includes(existing.status)) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
-      "Unsubmit your work before making changes.",
+      existing.status === SubmissionStatus.REVIEWED
+        ? "This work has been graded and can't be changed."
+        : "Unsubmit your work before making changes.",
     );
   }
 
@@ -308,8 +342,9 @@ export async function createOrUpdateSubmission(
       existing,
       {
         textAnswer: input.textAnswer ?? null,
-        status: SubmissionStatus.ASSIGNED,
-        submittedAt: null,
+        // A draft of work returned for revision stays "returned" until it's turned in again.
+        status: existing?.status === SubmissionStatus.RETURNED ? SubmissionStatus.RETURNED : SubmissionStatus.ASSIGNED,
+        submittedAt: existing?.status === SubmissionStatus.RETURNED ? existing.submittedAt : null,
       },
       "This assignment was just turned in - unsubmit it before making changes.",
     );
@@ -338,11 +373,11 @@ export async function submitSubmission(
 ): Promise<SubmissionView> {
   const assignment = await loadAssignmentContext(assignmentId);
   await assertStudentEligibility(assignment.classroomId, user);
-  assertAssignmentAcceptsWork(assignment);
 
   const existing = await findSubmissionByAssignmentAndStudent(assignmentId, user.id);
+  assertAssignmentAcceptsWork(assignment, existing?.status ?? null);
 
-  if (existing && existing.status !== SubmissionStatus.ASSIGNED) {
+  if (existing && !EDITABLE_STATUSES.includes(existing.status)) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
       "This assignment has already been turned in.",
@@ -351,7 +386,8 @@ export async function submitSubmission(
 
   const now = new Date();
   // Late work only reaches this point when allowLateSubmission is on -
-  // assertAssignmentAcceptsWork has already rejected it otherwise.
+  // assertAssignmentAcceptsWork has already rejected it otherwise (except for
+  // a revision the teacher asked for, which is accepted and marked Late).
   const nextStatus = isLateSubmission(now, assignment.dueDate)
     ? SubmissionStatus.LATE
     : SubmissionStatus.SUBMITTED;
@@ -396,7 +432,12 @@ export async function unsubmitSubmission(
   const existing = await findSubmissionByAssignmentAndStudent(assignmentId, user.id);
 
   if (!existing || existing.deletedAt || !UNSUBMITTABLE_STATUSES.includes(existing.status)) {
-    throw new ClassroomServiceError("VALIDATION_ERROR", "Only turned-in work can be unsubmitted.");
+    throw new ClassroomServiceError(
+      "VALIDATION_ERROR",
+      existing?.status === SubmissionStatus.REVIEWED
+        ? "This work has been graded and can't be unsubmitted."
+        : "Only turned-in work that hasn't been graded can be unsubmitted.",
+    );
   }
 
   if (assignment.status === AssignmentStatus.CLOSED) {
@@ -454,10 +495,12 @@ export async function removeSubmissionAttachment(
     throw new ClassroomServiceError("FORBIDDEN", "You can only edit your own submission.");
   }
 
-  if (submission.status !== SubmissionStatus.ASSIGNED) {
+  if (!EDITABLE_STATUSES.includes(submission.status)) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
-      "Unsubmit your work before removing an attachment.",
+      submission.status === SubmissionStatus.REVIEWED
+        ? "This work has been graded and can't be changed."
+        : "Unsubmit your work before removing an attachment.",
     );
   }
 
@@ -602,6 +645,7 @@ export async function getAssignmentSubmissions(
     notSubmitted: 0,
     missing: 0,
     late: 0,
+    graded: 0,
     returned: 0,
     rows,
   };
@@ -611,6 +655,7 @@ export async function getAssignmentSubmissions(
     else if (row.displayStatus === "NOT_SUBMITTED") overview.notSubmitted += 1;
     else if (row.displayStatus === "MISSING") overview.missing += 1;
     else if (row.displayStatus === "LATE") overview.late += 1;
+    else if (row.displayStatus === "GRADED") overview.graded += 1;
     else if (row.displayStatus === "RETURNED") overview.returned += 1;
   }
 
@@ -691,11 +736,9 @@ export async function getSubmissionDetails(
     submission ? listPrivateComments(submission.id, user.id, studentId) : Promise.resolve([]),
   ]);
 
-  const canReturn =
-    submission !== null &&
-    (submission.status === SubmissionStatus.SUBMITTED ||
-      submission.status === SubmissionStatus.LATE ||
-      submission.status === SubmissionStatus.REVIEWED);
+  // Turned-in or graded work can be graded (again) or sent back for revision;
+  // work already out for revision waits for the student to turn it in again.
+  const canReturn = submission !== null && GRADABLE_STATUSES.includes(submission.status);
 
   return {
     student: { id: student.id, name: student.name, image: toDisplayName(student) },
@@ -714,10 +757,7 @@ export async function getSubmissionDetails(
         }
       : null,
     canReturn,
-    canGrade:
-      submission !== null &&
-      submission.status !== SubmissionStatus.RETURNED &&
-      assignment.points !== null,
+    canGrade: canReturn && assignment.points !== null,
     comments,
   };
 }
@@ -823,18 +863,24 @@ export async function deletePrivateComment(commentId: string, user: SessionUser)
  * not when it was first assigned - matching Google Classroom, where a grade
  * stays private and editable until the teacher explicitly returns it.
  */
+/**
+ * Sends work back to the student for revision, with a note on what to
+ * improve. It isn't graded: any grade is cleared (the caller also removes it
+ * from the marks sheet), and the student revises and turns it in again.
+ */
 export async function returnSubmission(
   classroomId: string,
   assignmentId: string,
   studentId: string,
   user: SessionUser,
+  note?: string,
 ): Promise<SubmissionReviewDetail> {
   const assignment = await loadAssignmentForManager(classroomId, assignmentId, user);
   await assertActiveStudentOfClassroom(classroomId, studentId);
 
   const submission = await findSubmissionByAssignmentAndStudent(assignmentId, studentId);
 
-  if (!submission || submission.deletedAt) {
+  if (!submission || submission.deletedAt || submission.status === SubmissionStatus.ASSIGNED) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
       "This student hasn't submitted anything yet.",
@@ -844,44 +890,47 @@ export async function returnSubmission(
   if (submission.status === SubmissionStatus.RETURNED) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
-      "This submission has already been returned.",
+      "This work is already with the student for revision.",
     );
   }
 
-  if (
-    submission.status !== SubmissionStatus.SUBMITTED &&
-    submission.status !== SubmissionStatus.LATE &&
-    submission.status !== SubmissionStatus.REVIEWED
-  ) {
+  if (!GRADABLE_STATUSES.includes(submission.status)) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
-      "Only a turned-in submission can be returned.",
+      "Only turned-in work can be returned for revision.",
     );
   }
 
-  const now = new Date();
-  const isGraded = submission.grade !== null;
-  await prisma.submission.update({
-    where: { id: submission.id },
+  // Conditional on the status just checked, so a student's change landing at the same moment isn't overwritten.
+  const { count } = await prisma.submission.updateMany({
+    where: { id: submission.id, status: submission.status },
     data: {
       status: SubmissionStatus.RETURNED,
-      returnedAt: now,
-      gradedAt: isGraded ? now : null,
+      returnedAt: new Date(),
+      grade: null,
+      gradedAt: null,
+      feedback: note?.trim() ? note.trim() : submission.feedback,
     },
   });
+  if (count === 0) {
+    throw new ClassroomServiceError("VALIDATION_ERROR", "This work just changed - reload the page and try again.");
+  }
 
   await notifySubmissionReturned({
     studentId,
     classroomId,
     assignmentId,
     assignmentTitle: assignment.title,
-    isGraded,
   });
 
   return getSubmissionDetails(classroomId, assignmentId, studentId, user);
 }
 
-/** Shared upsert used by both the initial grade-entry and edit-before-return flows. */
+/**
+ * Grades turned-in work, or changes an existing grade. Grading is final: the
+ * student sees the grade and feedback straight away, and the caller copies it
+ * to the marks sheet when the assignment is linked to a marks item.
+ */
 export async function setSubmissionGrade(
   classroomId: string,
   assignmentId: string,
@@ -931,17 +980,30 @@ export async function setSubmissionGrade(
   if (submission.status === SubmissionStatus.RETURNED) {
     throw new ClassroomServiceError(
       "VALIDATION_ERROR",
-      "This submission has already been returned - the grade is locked.",
+      "This work is with the student for revision - grade it once they turn it in again.",
     );
   }
 
-  await prisma.submission.update({
-    where: { id: submission.id },
+  const wasGraded = submission.status === SubmissionStatus.REVIEWED;
+  const { count } = await prisma.submission.updateMany({
+    where: { id: submission.id, status: submission.status },
     data: {
       grade: input.grade,
       feedback: input.feedback ?? null,
       status: SubmissionStatus.REVIEWED,
+      gradedAt: new Date(),
     },
+  });
+  if (count === 0) {
+    throw new ClassroomServiceError("VALIDATION_ERROR", "This work just changed - reload the page and try again.");
+  }
+
+  await notifySubmissionGraded({
+    studentId,
+    classroomId,
+    assignmentId,
+    assignmentTitle: assignment.title,
+    regraded: wasGraded,
   });
 
   return getSubmissionDetails(classroomId, assignmentId, studentId, user);

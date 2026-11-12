@@ -23,7 +23,7 @@ export function ReviewSummaryCards({ summary }: { summary: ReviewQueueSummary })
         href="/review?status=LATE"
       />
       <StatCard
-        label="Returned today"
+        label="Returned for revision today"
         value={summary.returnedToday}
         icon={CheckCircle2}
         hint="Since midnight"

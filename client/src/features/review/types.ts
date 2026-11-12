@@ -6,7 +6,7 @@ export type { SubmissionReviewDetail } from "@/features/submissions/types";
 export type ReviewSortKey = "newest" | "oldest" | "dueDate" | "studentName" | "assignmentName";
 
 /** Collapsed, presentational status - mirrors submissions' displayStatus vocabulary, minus NOT_SUBMITTED/DRAFT which never appear in this queue. */
-export type ReviewDisplayStatus = "SUBMITTED" | "LATE" | "RETURNED";
+export type ReviewDisplayStatus = "SUBMITTED" | "LATE" | "GRADED" | "RETURNED";
 
 export interface ReviewQueueFilters {
   classroomId?: string;

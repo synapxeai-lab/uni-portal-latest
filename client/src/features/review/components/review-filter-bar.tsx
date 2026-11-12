@@ -17,7 +17,8 @@ const SORT_OPTIONS: { value: ReviewSortKey; label: string }[] = [
 const STATUS_OPTIONS = [
   { value: "SUBMITTED", label: "Submitted" },
   { value: "LATE", label: "Late" },
-  { value: "RETURNED", label: "Returned" },
+  { value: "GRADED", label: "Graded" },
+  { value: "RETURNED", label: "Returned for revision" },
 ];
 
 interface ReviewFilterBarProps {

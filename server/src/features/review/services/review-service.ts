@@ -109,21 +109,18 @@ async function getFilterOptions(classroomIds: string[]): Promise<ReviewFilterOpt
 }
 
 /**
- * REVIEWED collapses the original on-time/late distinction into one enum
- * value (see submissions/lib/display-status.ts) - filtering by the
- * presentational SUBMITTED/LATE bucket therefore widens SUBMITTED to also
- * include REVIEWED (the common case: grading in progress on an on-time
- * submission) while LATE matches only the raw LATE status. A REVIEWED
- * submission that was originally late will appear under "Submitted" here -
- * the same approximation the rest of the codebase already accepts rather
- * than re-deriving wasLate inside a SQL WHERE clause.
+ * SUBMITTED and LATE are turned-in work waiting to be graded (LATE matches
+ * only the raw LATE status rather than re-deriving wasLate in SQL); GRADED is
+ * REVIEWED (final); RETURNED is work out with the student for revision.
  */
 function statusWhere(status: ReviewQueueFilters["status"]): Prisma.SubmissionWhereInput {
   switch (status) {
     case "SUBMITTED":
-      return { status: { in: [SubmissionStatus.SUBMITTED, SubmissionStatus.REVIEWED] } };
+      return { status: SubmissionStatus.SUBMITTED };
     case "LATE":
       return { status: SubmissionStatus.LATE };
+    case "GRADED":
+      return { status: SubmissionStatus.REVIEWED };
     case "RETURNED":
       return { status: SubmissionStatus.RETURNED };
     default:
@@ -168,7 +165,9 @@ function toReviewQueueRow(row: {
   const displayStatus =
     row.status === SubmissionStatus.RETURNED
       ? "RETURNED"
-      : row.status === SubmissionStatus.LATE || wasLate
+      : row.status === SubmissionStatus.REVIEWED
+        ? "GRADED"
+        : row.status === SubmissionStatus.LATE || wasLate
         ? "LATE"
         : "SUBMITTED";
 
@@ -218,7 +217,7 @@ export async function getReviewSummary(classroomIds: string[]): Promise<ReviewQu
 
   const rows = await prisma.$queryRaw<SummaryRawRow[]>`
     SELECT
-      COUNT(*) FILTER (WHERE s.status IN ('SUBMITTED', 'LATE', 'REVIEWED')) AS pending_reviews,
+      COUNT(*) FILTER (WHERE s.status IN ('SUBMITTED', 'LATE')) AS pending_reviews,
       COUNT(*) FILTER (
         WHERE s.status = 'LATE'
            OR (s.status IN ('REVIEWED', 'RETURNED') AND a."dueDate" IS NOT NULL AND s."submittedAt" > a."dueDate")

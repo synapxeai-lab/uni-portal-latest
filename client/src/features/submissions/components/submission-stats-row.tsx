@@ -11,7 +11,8 @@ export function SubmissionStatsRow({ overview }: SubmissionStatsRowProps) {
     { label: "Not submitted", value: overview.notSubmitted },
     { label: "Missing", value: overview.missing },
     { label: "Late", value: overview.late },
-    { label: "Returned", value: overview.returned },
+    { label: "Graded", value: overview.graded },
+    { label: "Returned for revision", value: overview.returned },
   ];
 
   return (

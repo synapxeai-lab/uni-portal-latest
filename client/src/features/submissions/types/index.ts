@@ -14,7 +14,7 @@ export interface SubmissionDetail {
   submittedAt: Date | null;
   updatedAt: Date;
   returnedAt: Date | null;
-  /** Null when ungraded, or (student view only) when graded but not yet returned. */
+  /** Null when ungraded, or (student view only) when returned for revision. */
   grade: number | null;
   /** Same visibility rule as grade. */
   feedback: string | null;
@@ -65,6 +65,9 @@ export interface SubmissionOverview {
   notSubmitted: number;
   missing: number;
   late: number;
+  /** Graded (final). */
+  graded: number;
+  /** Returned to the student for revision. */
   returned: number;
   rows: StudentSubmissionRow[];
 }
@@ -73,7 +76,7 @@ export interface SubmissionReviewDetail {
   student: { id: string; name: string; image: string | null };
   submission: SubmissionDetail | null;
   canReturn: boolean;
-  /** Whether a grade may currently be assigned/edited (turned in, not yet returned, assignment has max points). */
+  /** Whether a grade may be given or changed (turned in or graded, not out for revision, assignment has max points). */
   canGrade: boolean;
   comments: PrivateCommentSummary[];
 }

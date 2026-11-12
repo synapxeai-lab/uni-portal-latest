@@ -39,7 +39,7 @@ export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
   NEW_ASSIGNMENT: "Assignments",
   NEW_MATERIAL: "Materials",
   NEW_ANNOUNCEMENT: "Announcements",
-  SUBMISSION_RETURNED: "Returned work",
+  SUBMISSION_RETURNED: "Graded or returned work",
   PRIVATE_COMMENT: "Private comments",
   CLASS_COMMENT: "Class comments",
   GENERAL: "General",

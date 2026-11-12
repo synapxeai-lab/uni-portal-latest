@@ -195,30 +195,42 @@ FLOWS.submissions = async function submissions(browser) {
     "Unsubmit after turning in",
   );
 
-  // Teacher grades and returns it on a tablet-width review page.
+  // Teacher returns it for revision on a tablet-width review page.
   await teacher.page.setViewportSize({ width: 820, height: 1180 });
   await teacher.page.goto(`${assignmentUrl}/submissions/${studentId}`);
   await expectVisible(
     teacher.page.getByText("My flow answer"),
     "the student's answer on the review page",
   );
+  await teacher.page.getByRole("button", { name: /^return for revision$/i }).click();
+  await teacher.page.locator("#return-note").fill("Add an example");
+  await teacher.page.getByRole("dialog").getByRole("button", { name: /^return for revision$/i }).click();
+  await expectVisible(teacher.page.getByText(/returned for revision/i).first(), "the Returned for revision state");
+
+  // The student sees the note, revises and turns it in again.
+  await student.page.goto(assignmentUrl);
+  await expectVisible(student.page.getByText("Add an example"), "the teacher's revision note for the student");
+  await student.page.getByPlaceholder(/type your response/i).fill("My revised flow answer");
+  await student.page.getByRole("button", { name: /^turn in$/i }).click();
+  await student.page.getByRole("alertdialog").getByRole("button", { name: /^turn in$/i }).click();
+  await expectVisible(student.page.getByRole("button", { name: /unsubmit/i }), "Unsubmit after turning in again");
+
+  // Teacher grades it - final, no return step.
+  await teacher.page.goto(`${assignmentUrl}/submissions/${studentId}`);
   await teacher.page.locator("#grade-input").fill("15");
   await teacher.page.locator("#feedback-input").fill("Nice work");
   await teacher.page.getByRole("button", { name: /save grade/i }).click();
-  await expectVisible(teacher.page.getByRole("button", { name: /^return$/i }), "the Return button");
-  await teacher.page.getByRole("button", { name: /^return$/i }).click();
-  await teacher.page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: /^return$/i })
-    .click();
-  await expectVisible(teacher.page.getByText(/returned/i), "the Returned state");
+  await expectVisible(teacher.page.getByText(/^graded$/i).first(), "the Graded state");
 
-  // The student sees the returned grade and feedback.
+  // The student sees the grade and feedback straight away, and can't unsubmit graded work.
   await student.page.goto(assignmentUrl);
   await expectVisible(
     student.page.getByText("Nice work"),
     "the teacher's feedback for the student",
   );
+  if (await student.page.getByRole("button", { name: /unsubmit/i }).count()) {
+    throw new Error("A student can still unsubmit graded work");
+  }
 
   await teacher.page.evaluate(
     async ({ classroomId, assignmentId }) => {

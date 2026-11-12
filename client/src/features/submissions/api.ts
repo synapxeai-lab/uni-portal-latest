@@ -141,16 +141,18 @@ export function deletePrivateCommentAction(
   );
 }
 
-export function returnGradedSubmissionAction(
+/** Sends work back to the student for revision, with a note on what to improve. Not a grade. */
+export function returnForRevisionAction(
   classroomId: string,
   assignmentId: string,
   studentId: string,
+  note: string | undefined,
 ) {
   return apiAction<SubmissionReviewDetail>(
     "post",
     `${base(classroomId, assignmentId)}/submissions/${studentId}/return`,
-    undefined,
-    "Couldn't return this submission. Please try again.",
+    { note },
+    "Couldn't return this work. Please try again.",
   );
 }
 

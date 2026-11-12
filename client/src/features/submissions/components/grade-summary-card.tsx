@@ -26,7 +26,7 @@ export function GradeSummaryCard({ summary, maxPoints }: GradeSummaryCardProps) 
     { label: "Lowest", value: formatStat(summary.lowestGrade, maxPoints) },
     { label: "Graded", value: String(summary.gradedCount) },
     { label: "Pending", value: String(summary.pendingCount) },
-    { label: "Returned", value: String(summary.returnedCount) },
+    { label: "Returned for revision", value: String(summary.returnedCount) },
   ];
 
   return (
