@@ -7,14 +7,32 @@ import { conflictError, notFoundError } from "../lib/http";
 import { ensureDefaultSections } from "../lib/section-sync";
 import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 
+/**
+ * The app already shows "Batch" before a batch's name, so a leading "Batch"
+ * typed by the admin is dropped ("Batch 2026" is batch "2026"), and repeated
+ * spaces collapse.
+ */
+const cleanBatchName = (name: string) => name.trim().replace(/^batch(?:[\s-]+|$)/i, "").replace(/\s+/g, " ").trim();
+
+/** Two names are the same batch when they match ignoring case, spaces and hyphens ("Spring-27" = "spring 27"). */
+const batchKey = (name: string) => cleanBatchName(name).toLowerCase().replace(/[\s-]+/g, "");
+
+function findSameBatch(existing: string[], name: string, except?: string) {
+  return existing.find((batch) => batch !== except && batchKey(batch) === batchKey(name));
+}
+
 export const batchSchema = z
   .object({
     name: z
       .string()
-      .trim()
-      .min(1, "Batch name is required")
-      .max(20, "Batch name must be at most 20 characters")
-      .regex(/^[A-Za-z0-9][A-Za-z0-9 -]*$/, "Use letters, numbers, spaces or hyphens only"),
+      .transform(cleanBatchName)
+      .pipe(
+        z
+          .string()
+          .min(1, "Batch name is required")
+          .max(20, "Batch name must be at most 20 characters")
+          .regex(/^[A-Za-z0-9][A-Za-z0-9 -]*$/, "Use letters, numbers, spaces or hyphens only"),
+      ),
     year: z.coerce
       .number({ error: "Batch year is required" })
       .int("Batch year must be a whole year")
@@ -33,9 +51,9 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 
 /** Adds a batch; every diploma gets Sections A and B in it. */
 export async function createBatch({ name, year }: BatchInput) {
-  const existing = await getAllBatches();
-  if (existing.some((batch) => batch.toLowerCase() === name.toLowerCase())) {
-    throw conflictError(`Batch ${name} already exists.`);
+  const same = findSameBatch(await getAllBatches(), name);
+  if (same) {
+    throw conflictError(`Batch ${same} already exists.`);
   }
   // Re-adding a batch that was deleted earlier brings it back.
   await prisma.batch.upsert({ where: { name }, update: { year, removed: false }, create: { name, year } });
@@ -61,8 +79,9 @@ export async function updateBatch(oldName: string, { name, year }: BatchInput) {
     throw notFoundError("Batch not found.");
   }
   const renamed = name !== oldName;
-  if (renamed && existing.some((batch) => batch !== oldName && batch.toLowerCase() === name.toLowerCase())) {
-    throw conflictError(`Batch ${name} already exists.`);
+  const same = renamed ? findSameBatch(existing, name, oldName) : undefined;
+  if (same) {
+    throw conflictError(`Batch ${same} already exists.`);
   }
   await prisma.$transaction(async (tx) => {
     if (renamed) {
