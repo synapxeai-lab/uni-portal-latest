@@ -337,27 +337,35 @@
   /* In the base layer so utilities like scrollbar-on-hover can override it. */
   * {
     box-sizing: border-box;
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
 
-  @supports not (scrollbar-color: auto) {
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+  /*
+   * Slim scrollbars. Chrome, Edge and Safari draw the 6px ::-webkit-scrollbar
+   * below; Chrome ignores it on any element with scrollbar-width or
+   * scrollbar-color set (its own "thin" is ~11px), so those two are given to
+   * Firefox only, whose "thin" is already slim.
+   */
+  @supports (-moz-appearance: none) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
     }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      border: 2px solid transparent;
-      border-radius: 9999px;
-      background-clip: padding-box;
-      background-color: var(--scrollbar-thumb);
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background-color: var(--scrollbar-thumb-hover);
-    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: var(--scrollbar-thumb);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -380,12 +388,16 @@
  * or holds keyboard focus. Its space is still reserved, so links don't shift.
  */
 @utility scrollbar-on-hover {
-  scrollbar-color: transparent transparent;
   scrollbar-gutter: stable;
 
-  &:hover,
-  &:focus-within {
-    scrollbar-color: var(--sidebar-muted) transparent;
+  /* Firefox only, as above: in Chrome these would replace the slim scrollbar. */
+  @supports (-moz-appearance: none) {
+    scrollbar-color: transparent transparent;
+
+    &:hover,
+    &:focus-within {
+      scrollbar-color: var(--sidebar-muted) transparent;
+    }
   }
 
   &::-webkit-scrollbar-thumb {
