@@ -79,7 +79,7 @@ const DEFAULT_PAGES = {
     "/attendance",
     "/change-password",
   ],
-  student: [...COMMON_PAGES, "/todo", "/my-courses", "/registration", "/my-attendance", "/my-marks", "/transcript", "/fee-challan"],
+  student: [...COMMON_PAGES, "/todo", "/my-courses", "/registration", "/my-attendance", "/my-attendance/{enrollmentId}", "/my-marks", "/transcript", "/fee-challan"],
 };
 
 const VIEWPORTS = {
@@ -165,6 +165,11 @@ for (const role of roles) {
         ids,
       );
       ids.studentId = submissions.overview?.rows?.[0]?.studentId ?? "none";
+    }
+    if (role === "student") {
+      // The first registered course, for its date-wise attendance history.
+      const mine = await page.evaluate(() => fetch("/api/my/attendance").then((r) => r.json()));
+      ids.enrollmentId = mine.groups?.flatMap((g) => g.courses)[0]?.enrollmentId ?? "none";
     }
     if (role === "admin") {
       // University records for the admin pages: the first diploma with a section.

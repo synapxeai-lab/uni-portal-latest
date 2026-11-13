@@ -80,6 +80,7 @@ export function AppRoutes() {
             <Route path="/my-courses" element={<MyCoursesPage />} />
             <Route path="/registration" element={<StudentRegistrationPage />} />
             <Route path="/my-attendance" element={<MyAttendancePage />} />
+            <Route path="/my-attendance/:enrollmentId" element={<MyAttendancePage />} />
             <Route path="/my-marks" element={<MyMarksPage />} />
             <Route path="/transcript" element={<TranscriptPage />} />
             <Route path="/fee-challan" element={<MyChallansPage />} />
