@@ -61,6 +61,10 @@ describe("academic structure API", () => {
   let first: Department;
   let second: Department;
   const batch = unique("B").slice(0, 12);
+  const otherBatch = unique("C").slice(0, 12);
+  // Intake years no real batch uses, so each test batch has its year to itself.
+  const year = 2090 + Math.floor(Math.random() * 5);
+  const otherYear = year + 5;
 
   beforeAll(async () => {
     admin = await signIn("admin");
@@ -74,6 +78,7 @@ describe("academic structure API", () => {
       }
     }
     await admin.delete(`/batches/${encodeURIComponent(batch)}`);
+    await admin.delete(`/batches/${encodeURIComponent(otherBatch)}`);
     if (category) {
       await admin.delete(`/programme-categories/${category.id}`);
     }
@@ -165,7 +170,7 @@ describe("academic structure API", () => {
   });
 
   it("adds a batch with Sections A and B in every diploma, and the next section letter", async () => {
-    const created = await admin.post("/batches", { name: batch, year: 2027 });
+    const created = await admin.post("/batches", { name: batch, year });
     expect(created.status).toBe(201);
 
     const diploma = await admin.get<{ department: Department }>(`/departments/${first.id}`);
@@ -179,7 +184,19 @@ describe("academic structure API", () => {
     expect(third.data.section.label).toBe("C");
 
     const list = await admin.get<{ details: { name: string; year: number }[] }>("/batches");
-    expect(list.data.details).toContainEqual({ name: batch, year: 2027 });
+    expect(list.data.details).toContainEqual({ name: batch, year });
+  });
+
+  it("allows only one batch per intake year", async () => {
+    expect((await admin.post("/batches", { name: otherBatch, year })).status).toBe(409);
+    // A fixed yearly batch holds its own year too.
+    expect((await admin.post("/batches", { name: otherBatch, year: 2026 })).status).toBe(409);
+
+    expect((await admin.post("/batches", { name: otherBatch, year: otherYear })).status).toBe(201);
+    const path = `/batches/${encodeURIComponent(otherBatch)}`;
+    expect((await admin.put(path, { name: otherBatch, year })).status).toBe(409);
+    // Re-saving a batch with its own year is fine.
+    expect((await admin.put(path, { name: otherBatch, year: otherYear })).status).toBe(200);
   });
 
   it("lets every role read programmes and batches, but only admins manage diplomas", async () => {

@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
 
-import { getAllBatches, getYearlyBatches } from "../lib/batches";
+import type { Prisma } from "@/generated/prisma/client";
+
+import { FIRST_BATCH, getBatchDetails, getYearlyBatches, type BatchDetail } from "../lib/batches";
 import { conflictError, notFoundError } from "../lib/http";
 import { ensureDefaultSections } from "../lib/section-sync";
 import { archiveOfferingsWhere } from "../lib/offering-classrooms";
@@ -19,6 +21,37 @@ const batchKey = (name: string) => cleanBatchName(name).toLowerCase().replace(/[
 
 function findSameBatch(existing: string[], name: string, except?: string) {
   return existing.find((batch) => batch !== except && batchKey(batch) === batchKey(name));
+}
+
+/** Each intake year has at most one batch, fixed or added. */
+function assertYearFree(existing: BatchDetail[], year: number, except?: string) {
+  const taken = existing.find((batch) => batch.name !== except && batch.year === year);
+  if (taken) {
+    throw conflictError(`The ${year} intake already has batch ${taken.name}. Each intake year can have only one batch.`);
+  }
+}
+
+type Tx = Prisma.TransactionClient;
+
+/**
+ * A batch added for an intake year whose fixed batch hasn't appeared yet (it
+ * appears on 1 September) takes that year: the fixed batch is marked removed
+ * so the year never ends up with two batches.
+ */
+async function claimYear(tx: Tx, name: string, year: number) {
+  const fixed = String(year);
+  if (year < FIRST_BATCH || name === fixed || getYearlyBatches().includes(fixed)) {
+    return;
+  }
+  await tx.batch.upsert({ where: { name: fixed }, update: { removed: true }, create: { name: fixed, year, removed: true } });
+}
+
+/** Undoes claimYear when a batch leaves a future intake year, so its fixed batch can appear again. */
+async function releaseYear(tx: Tx, year: number | null) {
+  if (year === null || getYearlyBatches().includes(String(year))) {
+    return;
+  }
+  await tx.batch.deleteMany({ where: { name: String(year), removed: true } });
 }
 
 export const batchSchema = z
@@ -51,12 +84,20 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 
 /** Adds a batch; every diploma gets Sections A and B in it. */
 export async function createBatch({ name, year }: BatchInput) {
-  const same = findSameBatch(await getAllBatches(), name);
+  const details = await getBatchDetails();
+  const same = findSameBatch(
+    details.map((batch) => batch.name),
+    name,
+  );
   if (same) {
     throw conflictError(`Batch ${same} already exists.`);
   }
-  // Re-adding a batch that was deleted earlier brings it back.
-  await prisma.batch.upsert({ where: { name }, update: { year, removed: false }, create: { name, year } });
+  assertYearFree(details, year);
+  await prisma.$transaction(async (tx) => {
+    await claimYear(tx, name, year);
+    // Re-adding a batch that was deleted earlier brings it back.
+    await tx.batch.upsert({ where: { name }, update: { year, removed: false }, create: { name, year } });
+  });
   const departments = await prisma.department.findMany({ select: { id: true } });
   await ensureDefaultSections(
     departments.map((department) => department.id),
@@ -74,16 +115,28 @@ export async function createBatch({ name, year }: BatchInput) {
  * semester and so their current diploma.
  */
 export async function updateBatch(oldName: string, { name, year }: BatchInput) {
-  const existing = await getAllBatches();
-  if (!existing.includes(oldName)) {
+  const details = await getBatchDetails();
+  const current = details.find((batch) => batch.name === oldName);
+  if (!current) {
     throw notFoundError("Batch not found.");
   }
   const renamed = name !== oldName;
-  const same = renamed ? findSameBatch(existing, name, oldName) : undefined;
+  const same = renamed
+    ? findSameBatch(
+        details.map((batch) => batch.name),
+        name,
+        oldName,
+      )
+    : undefined;
   if (same) {
     throw conflictError(`Batch ${same} already exists.`);
   }
+  assertYearFree(details, year, oldName);
   await prisma.$transaction(async (tx) => {
+    if (current.year !== year) {
+      await releaseYear(tx, current.year);
+    }
+    await claimYear(tx, name, year);
     if (renamed) {
       await tx.section.updateMany({ where: { batch: oldName }, data: { batch: name } });
       await tx.student.updateMany({ where: { batch: oldName }, data: { batch: name } });
@@ -112,7 +165,8 @@ export async function updateBatch(oldName: string, { name, year }: BatchInput) {
 
 /** Removes a batch and its sections; refused while any student is still in it. */
 export async function deleteBatch(name: string) {
-  if (!(await getAllBatches()).includes(name)) {
+  const target = (await getBatchDetails()).find((batch) => batch.name === name);
+  if (!target) {
     throw notFoundError("Batch not found.");
   }
   const studentCount = await prisma.student.count({ where: { batch: name } });
@@ -132,6 +186,7 @@ export async function deleteBatch(name: string) {
       });
     } else {
       await tx.batch.deleteMany({ where: { name } });
+      await releaseYear(tx, target.year);
     }
     return deleted;
   });
