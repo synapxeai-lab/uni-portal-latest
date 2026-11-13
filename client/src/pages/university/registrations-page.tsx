@@ -174,7 +174,7 @@ export default function RegistrationsPage() {
             open={starting}
             onOpenChange={setStarting}
             title="Start registration"
-            description="The year follows from the semester. The previous semester must have ended."
+            description="The year follows from the semester. The previous semester must have ended. For Fall and Spring, every running batch is offered all the courses of its diploma; repeat courses are offered by hand."
             fields={[
               {
                 name: "semester",

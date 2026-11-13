@@ -16,7 +16,6 @@ import {
   getProgrammeDiplomas,
   openRegistrationWhere,
 } from "../lib/terms";
-import { offerCourse, offerDiplomaToBatch } from "./offering-service";
 import { DEFAULT_CREDIT_LIMIT } from "./registration-service";
 
 export const registerSchema = z.object({
@@ -95,23 +94,6 @@ const offeredInclude = (sectionWhere: Prisma.SectionWhereInput) =>
 
 type OfferedCourse = Prisma.CourseGetPayload<{ include: ReturnType<typeof offeredInclude> }>;
 
-/** Offers each missed/failed course to the student's batch in its own diploma, so gaps can be made up. */
-async function offerMissedCourses(student: Student, diplomas: Department[], semester: number | null, registrationId: number) {
-  if (!semester || semester < 2) {
-    return;
-  }
-  const unoffered = await prisma.course.findMany({
-    where: {
-      ...transcriptGapWhere(student, diplomas, semester, registrationId),
-      sectionLinks: { none: { section: { batch: student.batch } } },
-    },
-    select: { id: true, departmentId: true },
-  });
-  for (const course of unoffered) {
-    await offerCourse({ departmentId: course.departmentId, courseId: course.id, batch: student.batch }, null);
-  }
-}
-
 function findMissedCourses(student: Student, diplomas: Department[], semester: number, registrationId: number) {
   const where = transcriptGapWhere(student, diplomas, semester, registrationId);
   if (where.departmentId.in.length === 0) {
@@ -149,25 +131,22 @@ async function creditLimitFor(registrationId: number, batch: string) {
 }
 
 /**
- * Self-heal before showing registration: the student's section links, the
- * diploma's courses on offer to the batch, and missed courses offered again.
- * These are writes, so they run at most once a minute per student and period;
- * reloading the page within that minute is a pure read.
+ * Self-heal before showing registration: the student's section links. It
+ * offers nothing - the diploma's courses are offered when registration opens,
+ * and repeat/missed courses only when an admin offers them. A write, so it
+ * runs at most once a minute per student and period; reloading the page
+ * within that minute is a pure read.
  */
 const preparedAt = new Map<string, number>();
 const PREPARE_TTL_MS = 60_000;
 
-async function prepare(student: Student, diploma: Department | null, diplomas: Department[], semester: number | null, registrationId: number) {
+async function prepare(student: Student, registrationId: number) {
   const key = `${student.id}:${registrationId}`;
   const last = preparedAt.get(key);
   if (last && Date.now() - last < PREPARE_TTL_MS) {
     return false;
   }
   await syncEnrolledSection(student.id);
-  if (diploma) {
-    await offerDiplomaToBatch(diploma.id, student.batch, null);
-  }
-  await offerMissedCourses(student, diplomas, semester, registrationId);
   preparedAt.set(key, Date.now());
   return true;
 }
@@ -232,7 +211,7 @@ export async function getMyRegistration(userId: string) {
     };
   }
 
-  if (await prepare(student, diploma, diplomas, semester, registration.id)) {
+  if (await prepare(student, registration.id)) {
     student = await getSelfStudent(userId);
   }
 

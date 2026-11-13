@@ -261,12 +261,15 @@ export async function getCurrentTerm(now = new Date()): Promise<Term> {
   return registration ? { semester: registration.semester as Semester, year: registration.year } : getTermOn(now);
 }
 
-/** For each programme, which diploma every batch studies this term. */
-export async function currentDiplomas(now = new Date()) {
-  const [term, batches, diplomas] = await Promise.all([
-    getCurrentTerm(now),
+/**
+ * For each programme, the diploma every batch studies in a term. Batches that
+ * haven't started yet, and batches past their programme's last diploma
+ * (graduated), study none and are left out.
+ */
+async function termDiplomas(term: Term, category?: string) {
+  const [batches, diplomas] = await Promise.all([
     getBatchDetails(),
-    prisma.department.findMany({ orderBy: [{ semester: "asc" }, { id: "asc" }] }),
+    prisma.department.findMany({ where: category ? { category } : {}, orderBy: [{ semester: "asc" }, { id: "asc" }] }),
   ]);
   const current: { departmentId: number; batch: string }[] = [];
   for (const programme of new Set(diplomas.map((d) => d.category))) {
@@ -278,7 +281,13 @@ export async function currentDiplomas(now = new Date()) {
       }
     }
   }
-  return { term, current };
+  return current;
+}
+
+/** For each programme, which diploma every batch studies this term. */
+export async function currentDiplomas(now = new Date()) {
+  const term = await getCurrentTerm(now);
+  return { term, current: await termDiplomas(term) };
 }
 
 /** Offers every course of a diploma to every section of a batch. */
@@ -294,20 +303,45 @@ export async function offerDiplomaToBatch(departmentId: number, batch: string, a
   );
 }
 
-/** Offers each batch the full course list of the diploma it studies this term. */
-export async function offerCurrentDiplomas(actorId: string | null, now = new Date()) {
-  const { current } = await currentDiplomas(now);
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/**
+ * Offers each running batch every course of the diploma it studies in a
+ * term: run when a Fall or Spring registration opens. Not-started and
+ * graduated batches get nothing, nor do repeat/missed courses (an admin
+ * offers those). Summer isn't a diploma semester, so nothing is offered for
+ * it. Never duplicates an offering. `category` limits it to one programme.
+ */
+export async function offerTermDiplomas(term: Term, actorId: string | null, options: { category?: string } = {}) {
+  if (term.semester === "SUMMER") {
+    return { count: 0, message: "Summer courses aren't offered automatically: offer the ones students need." };
+  }
+  const current = await termDiplomas(term, options.category);
+  const withCourses = new Set(
+    (await prisma.course.groupBy({ by: ["departmentId"], where: { departmentId: { in: current.map((c) => c.departmentId) } } })).map(
+      (row) => row.departmentId,
+    ),
+  );
   let count = 0;
   for (const { departmentId, batch } of current) {
     count += await offerDiplomaToBatch(departmentId, batch, actorId);
   }
-  return {
-    count,
-    message:
-      count > 0
-        ? `Offered ${count} course-section(s) for this term's diplomas.`
-        : "Every batch already has its current diploma's courses on offer.",
-  };
+  const empty = new Set(current.map((c) => c.departmentId).filter((id) => !withCourses.has(id))).size;
+  const parts = [
+    count > 0
+      ? `${plural(count, "course section")} offered across ${plural(current.length, "batch diploma")}`
+      : current.length > 0
+        ? "every batch already has its diploma's courses on offer"
+        : "no batch is studying this term",
+    ...(empty > 0 ? [`${plural(empty, "diploma")} ${empty === 1 ? "has" : "have"} no courses yet`] : []),
+  ];
+  const message = parts.join(" · ");
+  return { count, message: message.charAt(0).toUpperCase() + message.slice(1) + "." };
+}
+
+/** The "Offer this term's diplomas" button: the same as when registration opens, for the current term. */
+export async function offerCurrentDiplomas(actorId: string | null, now = new Date()) {
+  return offerTermDiplomas(await getCurrentTerm(now), actorId);
 }
 
 /** The offering summary per diploma and batch, for the Offer Courses pages. */

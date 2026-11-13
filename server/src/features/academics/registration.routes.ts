@@ -7,6 +7,8 @@ import { currentUser, requireAdmin, requireRole } from "@/middleware/auth";
 import { UserRole } from "@/generated/prisma/enums";
 
 import { done, intParam, parseInputAsync } from "./lib/http";
+import type { Semester } from "./lib/terms";
+import * as offerings from "./services/offering-service";
 import * as registrations from "./services/registration-service";
 import * as studentRegistration from "./services/student-registration-service";
 import * as summary from "./services/summary-service";
@@ -39,8 +41,17 @@ admin.get("/", async (_req, res) => {
 
 admin.post("/", async (req, res) => {
   const registration = await registrations.startRegistration(parseInput(registrations.startRegistrationSchema, req.body));
+  // Opening registration sets the semester up: every running batch gets its diploma's courses.
+  let offered: string;
+  try {
+    const term = { semester: registration.semester as Semester, year: registration.year };
+    offered = (await offerings.offerTermDiplomas(term, currentUser(req).id)).message;
+  } catch (error) {
+    console.error("[registration] offering the term's diplomas failed", error);
+    offered = "Courses couldn't be offered automatically: use \"Offer this term's diplomas\" on the Offer courses page.";
+  }
   invalidateUniversity();
-  done(res, { registration, message: `Registration started for ${label(registration)}.` }, 201);
+  done(res, { registration, message: `Registration started for ${label(registration)}. ${offered}` }, 201);
 });
 
 admin.post("/:id/end", async (req, res) => {
