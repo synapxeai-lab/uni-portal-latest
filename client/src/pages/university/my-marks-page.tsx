@@ -7,7 +7,9 @@ import { AppLoading } from "@/app/layouts";
 import { QueryView } from "@/app/route-states";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useRouter, useSearchParams } from "@/lib/navigation";
 import { useUniversityQuery } from "@/features/academics/api";
 import { categoryLabel } from "@/features/academics/lib/marks";
 
@@ -53,6 +55,7 @@ function CourseMarksheet({ course }: { course: CourseMarks }) {
               <TableRow>
                 <TableHead>Assessment</TableHead>
                 <TableHead className="text-right">Marks</TableHead>
+                <TableHead className="w-28 text-right">Score</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -74,14 +77,14 @@ function CategoryBlock({ label, weightage, items }: { label: string; weightage: 
   return (
     <>
       <TableRow className="bg-muted/50 hover:bg-muted/50">
-        <TableCell colSpan={2}>
+        <TableCell colSpan={3}>
           <span className="font-bold">{label}</span>
           {weightage ? <span className="text-xs text-muted-foreground"> · {weightage}% of the course</span> : null}
         </TableCell>
       </TableRow>
       {items.length === 0 ? (
         <TableRow>
-          <TableCell colSpan={2} className="pl-6 text-sm text-muted-foreground">
+          <TableCell colSpan={3} className="pl-6 text-sm text-muted-foreground">
             Nothing yet.
           </TableCell>
         </TableRow>
@@ -92,6 +95,9 @@ function CategoryBlock({ label, weightage, items }: { label: string; weightage: 
             <TableCell className="text-right tabular-nums">
               {m.obtained === null ? <span className="text-muted-foreground">Not marked</span> : `${m.obtained} / ${m.total}`}
             </TableCell>
+            <TableCell className="text-right tabular-nums text-muted-foreground">
+              {m.obtained === null ? "-" : `${Math.round((m.obtained / m.total) * 1000) / 10}%`}
+            </TableCell>
           </TableRow>
         ))
       )}
@@ -99,36 +105,52 @@ function CategoryBlock({ label, weightage, items }: { label: string; weightage: 
   );
 }
 
-/** A student's marksheet for every course, by term. */
+/** A student's marksheet: pick a course, see its assessments and marks. */
 export default function MyMarksPage() {
   const query = useUniversityQuery<MyMarks>("/my/marks");
+  const router = useRouter();
+  const chosen = Number(useSearchParams().get("course"));
   return (
     <QueryView query={query} loading={<AppLoading />}>
-      {({ groups }) => (
-        <PageContainer>
-          <SectionHeader
-            title="Marks"
-            description="Your marksheet as teachers grade your work. Grades appear once they're released."
-            breadcrumbs={[{ label: "Marks" }]}
-          />
-          {groups.length === 0 ? (
-            <EmptyState icon={ClipboardList} title="No courses yet" />
-          ) : (
-            groups.map((group) => (
-              <div key={`${group.semester}-${group.year}`} className="flex flex-col gap-3">
-                <h2 className="font-heading text-base font-bold">
-                  {titleCase(group.semester)} {group.year}
-                </h2>
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {group.courses.map((course) => (
-                    <CourseMarksheet key={course.enrollmentId} course={course} />
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </PageContainer>
-      )}
+      {({ groups }) => {
+        const courses = groups.flatMap((g) => g.courses);
+        // The chosen course, else the first course of the latest term.
+        const course = courses.find((c) => c.enrollmentId === chosen) ?? courses[0];
+        return (
+          <PageContainer>
+            <SectionHeader
+              title="Marks"
+              description="Your marksheet as teachers grade your work. Grades appear once they're released."
+              breadcrumbs={[{ label: "Marks" }]}
+            />
+            {!course ? (
+              <EmptyState icon={ClipboardList} title="No courses yet" />
+            ) : (
+              <>
+                <label className="flex w-full max-w-xl flex-col gap-1 text-sm font-medium">
+                  Course
+                  <Select
+                    aria-label="Course"
+                    value={String(course.enrollmentId)}
+                    onChange={(e) => router.replace(`/my-marks?course=${e.target.value}`)}
+                  >
+                    {groups.map((group) => (
+                      <optgroup key={`${group.semester}-${group.year}`} label={`${titleCase(group.semester)} ${group.year}`}>
+                        {group.courses.map((c) => (
+                          <option key={c.enrollmentId} value={c.enrollmentId}>
+                            {c.code} {c.name} · Section {c.section.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </Select>
+                </label>
+                <CourseMarksheet key={course.enrollmentId} course={course} />
+              </>
+            )}
+          </PageContainer>
+        );
+      }}
     </QueryView>
   );
 }
