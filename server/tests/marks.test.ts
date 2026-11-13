@@ -108,6 +108,44 @@ describe("marks and grades API", () => {
     expect(saved.data.saved).toBe(1);
   });
 
+  it("lists the teacher's own course sections for the Marks and Attendance pages", async () => {
+    type Offerings = { offerings: { sectionId: number; courseId: number; teacher: { name: string } | null; students: number }[] };
+    const mine = (await teacher.get<Offerings>("/teaching/offerings")).data.offerings;
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine.some((o) => `/marks/${o.sectionId}/${o.courseId}` === sheetPath)).toBe(true);
+    expect(new Set(mine.map((o) => o.teacher?.name)).size).toBe(1);
+    const all = (await admin.get<Offerings>("/teaching/offerings")).data.offerings;
+    expect(all.length).toBeGreaterThanOrEqual(mine.length);
+    expect((await student.get("/teaching/offerings")).status).toBe(403);
+  });
+
+  it("saves one student's marksheet across assessments, within each item's total", async () => {
+    const sheet = (await teacher.get<Sheet>(sheetPath)).data;
+    const [first] = sheet.students;
+    const items = sheet.categories.flatMap((c) => c.assessments).slice(0, 2);
+    expect(items.length).toBeGreaterThan(0);
+    const path = `/marks/enrollments/${first.enrollmentId}/marks`;
+    const before = (await teacher.get<{ students: { enrollmentId: number; marks: Record<string, number | null> }[] }>(sheetPath)).data
+      .students.find((s) => s.enrollmentId === first.enrollmentId)!.marks;
+
+    const over = await teacher.put(path, { records: [{ assessmentId: items[0].id, obtained: items[0].totalMarks + 1 }] });
+    expect(over.status).toBe(400);
+    const foreign = await teacher.put(path, { records: [{ assessmentId: 999_999_999, obtained: 1 }] });
+    expect(foreign.status).toBe(400);
+
+    const saved = await teacher.put<{ saved: number }>(path, {
+      records: items.map((a) => ({ assessmentId: a.id, obtained: a.totalMarks })),
+    });
+    expect(saved.data.saved).toBe(items.length);
+    const after = (await teacher.get<{ students: { enrollmentId: number; marks: Record<string, number | null> }[] }>(sheetPath)).data
+      .students.find((s) => s.enrollmentId === first.enrollmentId)!.marks;
+    for (const a of items) expect(after[a.id]).toBe(a.totalMarks);
+
+    // Put the seeded marks back.
+    await teacher.put(path, { records: items.map((a) => ({ assessmentId: a.id, obtained: before[a.id] ?? null })) });
+    expect((await student.put(path, { records: [] })).status).toBe(403);
+  });
+
   it("refuses invalid grade ranges and lets the teacher override a grade", async () => {
     const bad = await teacher.put(`${sheetPath}/grading`, { grades: DEFAULT_GRADES.slice(1) });
     expect(bad.status).toBe(400);

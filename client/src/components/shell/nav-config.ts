@@ -79,6 +79,8 @@ export const navSections: NavSection[] = [
         icon: ClipboardList,
         roles: [UserRole.TEACHER, UserRole.ADMIN],
       },
+      { label: "Marks", href: "/marks", icon: BookCheck, roles: [UserRole.TEACHER] },
+      { label: "Attendance", href: "/attendance", icon: CalendarCheck, roles: [UserRole.TEACHER] },
       { label: "Grades", href: "/grades", icon: Award, roles: [UserRole.TEACHER] },
       { label: "Classes", href: "/classes", icon: BookOpen },
       { label: "Archived classes", href: "/archived", icon: Archive },
@@ -123,6 +125,8 @@ export const navSections: NavSection[] = [
       },
       { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
       { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck, roles: [UserRole.ADMIN] },
+      { label: "Take attendance", href: "/attendance", icon: CalendarPlus, roles: [UserRole.ADMIN] },
+      { label: "Marks", href: "/marks", icon: BookCheck, roles: [UserRole.ADMIN] },
       { label: "Grades", href: "/admin/grades", icon: Award, roles: [UserRole.ADMIN] },
       { label: "Fees", href: "/admin/fees", icon: Receipt, roles: [UserRole.ADMIN] },
       {

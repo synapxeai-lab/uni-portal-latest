@@ -21,6 +21,12 @@ const read = <T>(key: string, load: () => Promise<T>) =>
 
 // ---- Marks sheet (teacher of the offering, or admin) ----------------------------------
 
+// The course-section picker on the Marks and Attendance pages.
+marksRouter.get("/teaching/offerings", requireTeacherOrAdmin, async (req, res) => {
+  const viewer = currentUser(req);
+  res.json(await read(`teaching:${viewer.role === "ADMIN" ? "all" : viewer.id}`, () => marks.teachingOfferings(viewer)));
+});
+
 marksRouter.get("/marks/:sectionId/:courseId", requireTeacherOrAdmin, async (req, res) => {
   const sectionId = intParam(req, "sectionId", "section ID");
   const courseId = intParam(req, "courseId", "course ID");
@@ -64,6 +70,13 @@ marksRouter.put("/marks/assessments/:assessmentId/marks", requireTeacherOrAdmin,
   const result = await marks.saveMarks(currentUser(req), intParam(req, "assessmentId", "assessment ID"), records);
   invalidateUniversity();
   done(res, { ...result, message: "Marks saved." });
+});
+
+marksRouter.put("/marks/enrollments/:enrollmentId/marks", requireTeacherOrAdmin, async (req, res) => {
+  const { records } = parseInput(marks.saveStudentMarksSchema, req.body);
+  const result = await marks.saveStudentMarks(currentUser(req), intParam(req, "enrollmentId", "registration ID"), records);
+  invalidateUniversity();
+  done(res, { ...result, message: "Marksheet saved." });
 });
 
 marksRouter.put("/marks/:sectionId/:courseId/grading", requireTeacherOrAdmin, async (req, res) => {

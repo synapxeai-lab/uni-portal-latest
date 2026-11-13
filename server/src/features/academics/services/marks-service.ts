@@ -30,6 +30,11 @@ export const saveMarksSchema = z.object({
     z.object({ enrollmentId: z.number().int(), obtained: z.number().min(0, "Marks cannot be negative").nullable() }),
   ),
 });
+export const saveStudentMarksSchema = z.object({
+  records: z.array(
+    z.object({ assessmentId: z.number().int(), obtained: z.number().min(0, "Marks cannot be negative").nullable() }),
+  ),
+});
 export const gradingSchema = z.object({
   grades: z.array(z.object({ grade: z.enum(GRADE_LETTERS), min: z.number(), max: z.number() })),
 });
@@ -231,6 +236,44 @@ export async function saveMarks(viewer: Viewer, assessmentId: number, records: z
   return { saved: toSave.length };
 }
 
+/**
+ * One student's marksheet: marks for any of the course section's assessments
+ * (null clears one). Assessments from other courses or sections are refused.
+ */
+export async function saveStudentMarks(
+  viewer: Viewer,
+  enrollmentId: number,
+  records: z.infer<typeof saveStudentMarksSchema>["records"],
+) {
+  const enrollment = await loadEnrollmentFor(viewer, enrollmentId);
+  const ids = [...new Set(records.map((r) => r.assessmentId))];
+  const assessments = await prisma.assessment.findMany({
+    where: { id: { in: ids }, category: { courseId: enrollment.courseId, sectionId: enrollment.sectionId } },
+    select: { id: true, title: true, totalMarks: true },
+  });
+  const byId = new Map(assessments.map((a) => [a.id, a]));
+  if (byId.size !== ids.length) {
+    throw badRequest("Some of these assessments aren't part of this course section.");
+  }
+  const over = records.find((r) => r.obtained !== null && r.obtained > byId.get(r.assessmentId)!.totalMarks);
+  if (over) {
+    const assessment = byId.get(over.assessmentId)!;
+    throw badRequest(`${assessment.title}: marks can't exceed the total of ${assessment.totalMarks}.`);
+  }
+  await prisma.$transaction(
+    records.map((r) =>
+      r.obtained === null
+        ? prisma.mark.deleteMany({ where: { assessmentId: r.assessmentId, enrollmentId } })
+        : prisma.mark.upsert({
+            where: { assessmentId_enrollmentId: { assessmentId: r.assessmentId, enrollmentId } },
+            update: { obtained: r.obtained },
+            create: { assessmentId: r.assessmentId, enrollmentId, obtained: r.obtained },
+          }),
+    ),
+  );
+  return { saved: records.length };
+}
+
 export async function saveGrading(viewer: Viewer, sectionId: number, courseId: number, grades: GradeRange[]) {
   const invalid = validateGrades(grades);
   if (invalid) throw badRequest(invalid);
@@ -326,7 +369,7 @@ async function scope(viewer: Viewer, courseId: number | null) {
   return prisma.sectionCourse.findMany({
     where,
     include: {
-      section: { select: { id: true, label: true, batch: true } },
+      section: { select: { id: true, label: true, batch: true, department: { select: { code: true } } } },
       teacher: { select: { id: true, name: true } },
       course: { select: { id: true, code: true, name: true } },
       classroom: { select: { id: true } },
@@ -338,6 +381,30 @@ async function scope(viewer: Viewer, courseId: number | null) {
 const inLinks = (links: { courseId: number; sectionId: number }[]): Prisma.EnrollmentWhereInput => ({
   OR: links.map((l) => ({ courseId: l.courseId, sectionId: l.sectionId })),
 });
+
+/** The course sections the viewer keeps marks and attendance for (teacher: own; admin: all), with student counts. */
+export async function teachingOfferings(viewer: Viewer) {
+  const links = await scope(viewer, null);
+  if (links.length === 0) {
+    return { offerings: [] };
+  }
+  const counts = await prisma.enrollment.groupBy({
+    by: ["courseId", "sectionId"],
+    where: inLinks(links),
+    _count: { _all: true },
+  });
+  const byKey = new Map(counts.map((c) => [`${c.sectionId}-${c.courseId}`, c._count._all]));
+  return {
+    offerings: links.map((l) => ({
+      sectionId: l.sectionId,
+      courseId: l.courseId,
+      course: l.course,
+      section: l.section,
+      teacher: l.teacher,
+      students: byKey.get(`${l.sectionId}-${l.courseId}`) ?? 0,
+    })),
+  };
+}
 
 /** The Grades page: the offerings in scope, with student counts and how many have a generated grade. */
 export async function gradesOverview(viewer: Viewer) {

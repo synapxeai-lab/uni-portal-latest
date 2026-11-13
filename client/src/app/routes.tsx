@@ -51,10 +51,11 @@ const AssignTeachersPage = lazy(() => import("@/pages/university/assign-teachers
 const RegistrationsPage = lazy(() => import("@/pages/university/registrations-page"));
 const StudentRegistrationPage = lazy(() => import("@/pages/university/student-registration-page"));
 const MyCoursesPage = lazy(() => import("@/pages/university/my-courses-page"));
-const ClassroomAttendancePage = lazy(() => import("@/pages/classes/attendance-page"));
+const ClassroomOfferingRedirect = lazy(() => import("@/pages/classes/offering-redirect"));
+const TeachingAttendancePage = lazy(() => import("@/pages/teaching/attendance-page"));
 const AttendanceOverviewPage = lazy(() => import("@/pages/university/attendance-overview-page"));
 const MyAttendancePage = lazy(() => import("@/pages/university/my-attendance-page"));
-const ClassroomMarksPage = lazy(() => import("@/pages/classes/marks-page"));
+const TeachingMarksPage = lazy(() => import("@/pages/teaching/marks-page"));
 const GradesPage = lazy(() => import("@/pages/university/grades-page"));
 const MyMarksPage = lazy(() => import("@/pages/university/my-marks-page"));
 const TranscriptPage = lazy(() => import("@/pages/university/transcript-page"));
@@ -86,6 +87,11 @@ export function AppRoutes() {
           <Route element={<RoleRoute roles={[UserRole.TEACHER, UserRole.ADMIN]} denied="review" />}>
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/grades" element={<GradesPage />} />
+            <Route path="/marks" element={<TeachingMarksPage />} />
+            <Route path="/marks/:sectionId/:courseId" element={<TeachingMarksPage />} />
+            <Route path="/marks/:sectionId/:courseId/:enrollmentId" element={<TeachingMarksPage />} />
+            <Route path="/attendance" element={<TeachingAttendancePage />} />
+            <Route path="/attendance/:sectionId/:courseId" element={<TeachingAttendancePage />} />
           </Route>
           <Route path="/classes" element={<ClassesPage />} />
           <Route path="/classes/:classroomId" element={<ClassroomLayout />}>
@@ -99,8 +105,8 @@ export function AppRoutes() {
               element={<SubmissionReviewPage />}
             />
             <Route path="people" element={<PeoplePage />} />
-            <Route path="attendance" element={<ClassroomAttendancePage />} />
-            <Route path="marks" element={<ClassroomMarksPage />} />
+            <Route path="attendance" element={<ClassroomOfferingRedirect to="attendance" />} />
+            <Route path="marks" element={<ClassroomOfferingRedirect to="marks" />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           <Route path="/archived" element={<ArchivedClassesPage />} />

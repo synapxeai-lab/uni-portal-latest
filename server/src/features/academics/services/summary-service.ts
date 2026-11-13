@@ -64,6 +64,8 @@ export async function teacherSummary(userId: string) {
     role: "TEACHER" as const,
     ...periods,
     teaching: offerings.map((o) => ({
+      sectionId: o.sectionId,
+      courseId: o.courseId,
       course: o.course,
       section: o.section,
       classroomId: o.classroom?.id ?? null,

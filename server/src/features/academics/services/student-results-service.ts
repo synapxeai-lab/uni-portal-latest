@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 import { getBatchYears } from "../lib/batches";
 import { computeGpa, GRADE_POINTS, visibleGrade } from "../lib/grading";
+import { compareTypes } from "../lib/assessment-scheme";
 import { notFoundError } from "../lib/http";
 import { summarizeMarks, weightsFor } from "../lib/marks-summary";
 import { getSelfStudent } from "../lib/self";
@@ -35,7 +36,9 @@ async function toCourseMarks(enrollments: MarksEnrollment[]) {
         });
   return enrollments.map((e) => {
     const obtainedBy = new Map(e.marks.map((m) => [m.assessmentId, m.obtained]));
-    const own = categories.filter((c) => c.courseId === e.courseId && c.sectionId === e.sectionId);
+    const own = categories
+      .filter((c) => c.courseId === e.courseId && c.sectionId === e.sectionId)
+      .sort((a, b) => compareTypes(a.type, b.type) || a.id - b.id);
     const marks = own.flatMap((c) =>
       c.assessments.map((a) => ({
         id: a.id,
@@ -62,6 +65,8 @@ async function toCourseMarks(enrollments: MarksEnrollment[]) {
       creditHours: e.course.creditHours,
       section: e.section,
       summary: { ...summary, grade: visibleGrade(e) },
+      // Every category of the scheme in order, so the marksheet shows ones with nothing in them yet.
+      categories: own.map((c) => ({ id: c.id, type: c.type, weightage: c.weightage })),
       marks,
     };
   });

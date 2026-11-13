@@ -35,6 +35,8 @@ type Summary =
   | (Periods & {
       role: "TEACHER";
       teaching: {
+        sectionId: number;
+        courseId: number;
         course: { code: string; name: string; creditHours: number };
         section: { label: string; batch: string; department: { code: string } };
         classroomId: string | null;
@@ -151,10 +153,10 @@ export function UniversitySummary() {
                         <Link href={`/classes/${t.classroomId}/stream`}>Classroom</Link>
                       </Button>
                       <Button size="sm" variant="outline" asChild>
-                        <Link href={`/classes/${t.classroomId}/attendance`}>Attendance</Link>
+                        <Link href={`/attendance/${t.sectionId}/${t.courseId}`}>Attendance</Link>
                       </Button>
                       <Button size="sm" variant="outline" asChild>
-                        <Link href={`/classes/${t.classroomId}/marks`}>Marks</Link>
+                        <Link href={`/marks/${t.sectionId}/${t.courseId}`}>Marks</Link>
                       </Button>
                     </div>
                   ) : null}

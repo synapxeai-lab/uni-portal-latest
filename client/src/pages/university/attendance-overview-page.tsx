@@ -90,7 +90,7 @@ export default function AttendanceOverviewPage() {
                       <TableCell>
                         {o.classroomId ? (
                           <Button size="sm" variant="outline" asChild>
-                            <Link href={`/classes/${o.classroomId}/attendance`}>Open</Link>
+                            <Link href={`/attendance/${o.sectionId}/${o.courseId}`}>Open</Link>
                           </Button>
                         ) : null}
                       </TableCell>

@@ -9,19 +9,13 @@ const TABS = [
   { label: "People", segment: "people" },
 ] as const;
 
-// Only on the classroom of a university course offering.
-const OFFERING_TABS = [
-  { label: "Attendance", segment: "attendance" },
-  { label: "Marks", segment: "marks" },
-] as const;
-
-export function ClassroomTabs({ classroomId, isOffering = false }: { classroomId: string; isOffering?: boolean }) {
+// A course classroom's attendance and marks live on the sidebar's Attendance and Marks pages.
+export function ClassroomTabs({ classroomId }: { classroomId: string }) {
   const pathname = usePathname();
-  const tabs = isOffering ? [...TABS, ...OFFERING_TABS] : TABS;
 
   return (
     <nav aria-label="Classroom" className="flex gap-1 overflow-x-auto border-b border-border">
-      {tabs.map((tab) => {
+      {TABS.map((tab) => {
         const href = `/classes/${classroomId}/${tab.segment}`;
         const isActive = pathname === href || pathname.startsWith(`${href}/`);
 

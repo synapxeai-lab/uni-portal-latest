@@ -154,7 +154,7 @@ export default function GradesPage() {
                             <div className="flex gap-1">
                               {o.classroomId ? (
                                 <Button size="sm" variant="outline" asChild>
-                                  <Link href={`/classes/${o.classroomId}/marks`}>Marks</Link>
+                                  <Link href={`/marks/${o.sectionId}/${o.courseId}`}>Marks</Link>
                                 </Button>
                               ) : null}
                               <Button

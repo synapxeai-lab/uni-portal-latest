@@ -38,8 +38,6 @@ const COMMON_PAGES = [
   "/classes/{classroomId}/people",
   "/classes/{classroomId}/classwork",
   "/classes/{classroomId}/classwork/{assignmentId}",
-  "/classes/{classroomId}/attendance",
-  "/classes/{classroomId}/marks",
 ];
 const DEFAULT_PAGES = {
   admin: [
@@ -66,6 +64,8 @@ const DEFAULT_PAGES = {
     "/admin/registration",
     "/admin/attendance",
     "/admin/grades",
+    "/marks",
+    "/attendance",
     "/admin/fees",
     "/change-password",
   ],
@@ -75,6 +75,8 @@ const DEFAULT_PAGES = {
     "/classes/{classroomId}/classwork/{assignmentId}/submissions",
     "/classes/{classroomId}/classwork/{assignmentId}/submissions/{studentId}",
     "/grades",
+    "/marks",
+    "/attendance",
     "/change-password",
   ],
   student: [...COMMON_PAGES, "/todo", "/my-courses", "/registration", "/my-attendance", "/my-marks", "/transcript", "/fee-challan"],
