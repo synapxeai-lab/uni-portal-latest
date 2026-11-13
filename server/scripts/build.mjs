@@ -10,8 +10,13 @@ const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 const external = Object.keys(pkg.dependencies).filter((name) => name !== "@portal/shared");
 
 await build({
-  // create-admin: creates the first admin in production (no tsx/seed there).
-  entryPoints: { index: "src/index.ts", "create-admin": "scripts/create-admin.ts" },
+  // create-admin: creates the first admin in production (no tsx there).
+  // seed: the demo data (admin, teachers, students, courses...), run on demand.
+  entryPoints: {
+    index: "src/index.ts",
+    "create-admin": "scripts/create-admin.ts",
+    seed: "prisma/seed.ts",
+  },
   outdir: "dist",
   bundle: true,
   platform: "node",
@@ -25,4 +30,4 @@ await build({
   },
 });
 
-console.log("server built -> dist/index.js, dist/create-admin.js");
+console.log("server built -> dist/index.js, dist/create-admin.js, dist/seed.js");

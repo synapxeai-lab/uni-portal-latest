@@ -137,7 +137,7 @@ Make sure `portal-db` is running, then click **Deploy** on `portal` and follow t
 
 ## 11. Create the first admin
 
-The demo seed isn't part of production. Create your own admin account instead. Open the `portal` service's **Docker** tab, choose the `app` container, then **Terminal** with shell `sh`, and run:
+Create your own admin account (or load the demo data, below). Open the `portal` service's **Docker** tab, choose the `app` container, then **Terminal** with shell `sh`, and run:
 
 ```sh
 ADMIN_EMAIL='admin@eithm.edu.pk' ADMIN_PASSWORD='a-strong-password' ADMIN_NAME='Portal Administrator' node dist/create-admin.js
@@ -152,6 +152,12 @@ docker exec -it \
 ```
 
 Then sign in at `https://portal.yourdomain.com`. Running the command again with the same email resets that account's password and unlocks it. Use this if you're ever locked out.
+
+To load the demo data instead (admin `admin@eithm.edu.pk` / `Admin@12345`, plus teachers, students, courses, classrooms, attendance and marks; see `server/prisma/seed/accounts.ts`), run this in the same terminal. It only adds missing records and is safe to re-run:
+
+```sh
+node dist/seed.js
+```
 
 ## 12. Automatic deploys (optional)
 

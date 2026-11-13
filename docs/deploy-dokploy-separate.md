@@ -171,6 +171,12 @@ docker exec -it \
 
 Sign in at `https://portal.yourdomain.com`. Running the command again with the same email resets that account's password.
 
+To load the demo data instead (admin `admin@eithm.edu.pk` / `Admin@12345`, plus teachers, students, courses, classrooms, attendance and marks; see `server/prisma/seed/accounts.ts`), run this in the same terminal. It only adds missing records and is safe to re-run:
+
+```sh
+node dist/seed.js
+```
+
 ## 8. Automatic deploys (optional)
 
 Turn on **Autodeploy** on both services. Then set **Watch Paths** (General tab) so that a push rebuilds only the service it affects:
