@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { UserRole, UserStatus } from "@/generated/prisma/client";
 
 import { SEED_ACCOUNTS, type SeedAccount } from "./seed/accounts";
+import { FUTURE_STUDENT, seedFutureStudent } from "./seed/future-student";
 
 /** Accounts added while testing the portal, given the same demo passwords. */
 const TEST_ACCOUNTS: SeedAccount[] = [
@@ -23,6 +24,8 @@ const TEST_ACCOUNTS: SeedAccount[] = [
   { key: "fatima", name: "Ms. Fatima Noor", email: "fatima.noor@eithm.edu.pk", password: "Teacher@123", role: UserRole.TEACHER },
   { key: "ahmed", name: "Ahmed Siddiqui", email: "ahmed.siddiqui@eithm.edu.pk", password: "Student@123", role: UserRole.STUDENT },
   { key: "ayesha-malik", name: "Ayesha Malik", email: "ayesha.malik@eithm.edu.pk", password: "Student@123", role: UserRole.STUDENT },
+  // The 2027 intake (not started yet): Registration says "Your batch has not started yet".
+  { key: "areeba", name: FUTURE_STUDENT.name, email: FUTURE_STUDENT.email, password: FUTURE_STUDENT.password, role: UserRole.STUDENT },
 ];
 
 const ACCOUNTS = [...SEED_ACCOUNTS, ...TEST_ACCOUNTS];
@@ -47,6 +50,8 @@ async function linkProfile(account: SeedAccount, userId: string) {
 
 async function main() {
   const reset = process.argv.includes("--reset-passwords");
+  // Her record (and the 2027 batch, if missing) first, so her login links to it below.
+  await seedFutureStudent(prisma);
   const rows: Record<string, string>[] = [];
 
   for (const account of ACCOUNTS) {

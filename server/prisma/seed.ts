@@ -14,6 +14,7 @@ import { seedAccounts } from "./seed/accounts";
 import { seedAcademics } from "./seed/academics";
 import { seedPlatform } from "./seed/platform";
 import { seedPeople } from "./seed/people";
+import { seedFutureStudent } from "./seed/future-student";
 import { seedOfferings } from "./seed/offerings";
 import { seedRegistration } from "./seed/registration";
 import { seedAttendance } from "./seed/attendance";
@@ -27,6 +28,8 @@ async function main() {
   console.log(`Programme ${academics.programme}: ${academics.diplomaIds.length} diplomas`);
   const people = await seedPeople(prisma);
   console.log(`People: ${people.teachers} teachers, ${people.students} students`);
+  const future = await seedFutureStudent(prisma);
+  console.log(`Not-started intake: ${future.email} in batch ${future.batch}`);
   const offerings = await seedOfferings(prisma);
   console.log(`Offerings: ${offerings.classrooms} classrooms`);
   const registration = await seedRegistration(prisma);
