@@ -13,6 +13,7 @@
     "prisma:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "seed": "prisma db seed",
+    "seed:users": "tsx prisma/seed-users.ts",
     "latency": "tsx scripts/latency.ts",
     "test": "vitest run",
     "test:watch": "vitest",

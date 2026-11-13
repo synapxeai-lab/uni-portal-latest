@@ -45,7 +45,9 @@ Open **http://localhost:5180** and sign in:
 | Teacher (visiting) | bilal.ahmed@eithm.edu.pk | Teacher@123 |
 | Student | ali.raza@eithm.edu.pk | Student@123 |
 
-The other demo accounts are listed in `server/prisma/seed/accounts.ts`. The seed only adds data and can be re-run at any time. It creates:
+The other demo accounts are listed in `server/prisma/seed/accounts.ts`. To create just the sign-in accounts (admin, teachers, students) without the rest of the demo data, run `docker compose exec server npm run seed:users`. Add `-- --reset-passwords` to set existing accounts back to their listed passwords.
+
+The seed only adds data and can be re-run at any time. It creates:
 
 - a Tourism & Hospitality Management programme with two diplomas;
 - teachers and students;
