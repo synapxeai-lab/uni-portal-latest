@@ -6,7 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 
 import { FIRST_BATCH, getBatchDetails, getYearlyBatches, type BatchDetail } from "../lib/batches";
 import { conflictError, notFoundError } from "../lib/http";
-import { ensureDefaultSections } from "../lib/section-sync";
+import { createDefaultSections } from "../lib/section-sync";
 import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 
 /**
@@ -93,16 +93,18 @@ export async function createBatch({ name, year }: BatchInput) {
     throw conflictError(`Batch ${same} already exists.`);
   }
   assertYearFree(details, year);
+  const departments = await prisma.department.findMany({ select: { id: true } });
+  // The batch and its sections are saved together: never a batch without them.
   await prisma.$transaction(async (tx) => {
     await claimYear(tx, name, year);
     // Re-adding a batch that was deleted earlier brings it back.
     await tx.batch.upsert({ where: { name }, update: { year, removed: false }, create: { name, year } });
+    await createDefaultSections(
+      tx,
+      departments.map((department) => department.id),
+      [name],
+    );
   });
-  const departments = await prisma.department.findMany({ select: { id: true } });
-  await ensureDefaultSections(
-    departments.map((department) => department.id),
-    [name],
-  );
   return {
     batch: { name, year },
     message: `Batch ${name} (${year} intake) added with Sections A and B in ${plural(departments.length, "diploma")}.`,
@@ -193,4 +195,33 @@ export async function deleteBatch(name: string) {
   return {
     message: `Batch ${name} deleted${count ? ` along with ${plural(count, "section")}` : ""}.`,
   };
+}
+
+export interface BatchCounts {
+  sections: number;
+  diplomas: number;
+  students: number;
+}
+
+/**
+ * Per batch: its sections, the diplomas they are in, and its students.
+ * Students are counted once each (a student has a section in every diploma
+ * of their programme, so summing section rosters would overcount).
+ */
+export async function batchCounts(): Promise<Record<string, BatchCounts>> {
+  const [sections, students] = await Promise.all([
+    prisma.section.findMany({ select: { batch: true, departmentId: true } }),
+    prisma.student.groupBy({ by: ["batch"], _count: { _all: true } }),
+  ]);
+  const counts: Record<string, BatchCounts> = {};
+  const diplomas = new Map<string, Set<number>>();
+  const entry = (batch: string) => (counts[batch] ??= { sections: 0, diplomas: 0, students: 0 });
+  for (const section of sections) {
+    entry(section.batch).sections += 1;
+    if (!diplomas.has(section.batch)) diplomas.set(section.batch, new Set());
+    diplomas.get(section.batch)!.add(section.departmentId);
+  }
+  for (const [batch, set] of diplomas) entry(batch).diplomas = set.size;
+  for (const row of students) entry(row.batch).students = row._count._all;
+  return counts;
 }

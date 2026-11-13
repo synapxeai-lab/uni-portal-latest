@@ -17,6 +17,13 @@ export interface BatchDetail {
   year: number | null;
 }
 
+/** Per batch: its sections, the diplomas they are in, and its students (each counted once). */
+export interface BatchCounts {
+  sections: number;
+  diplomas: number;
+  students: number;
+}
+
 export interface ExtraFee {
   id: number;
   name: string;

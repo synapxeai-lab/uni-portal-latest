@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarRange, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarRange, ChevronRight, Layers, LayoutList, Pencil, Plus, Trash2, Users } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
@@ -10,26 +10,95 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Link from "@/components/ui/link";
 import { AdminLoading } from "@/app/layouts";
 import { QueryView } from "@/app/route-states";
-import { universityAction, useBatches, useDepartments } from "@/features/academics/api";
+import { universityAction, useBatches } from "@/features/academics/api";
 import { BatchDialog } from "@/features/academics/components/structure-dialogs";
 import { runAction } from "@/features/academics/components/ui";
-import type { BatchDetail } from "@/features/academics/types";
+import type { BatchCounts, BatchDetail } from "@/features/academics/types";
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+const NO_COUNTS: BatchCounts = { sections: 0, diplomas: 0, students: 0 };
+
+function Stat({ icon: Icon, label }: { icon: typeof Users; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      <Icon className="size-4 shrink-0" aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+/** One batch: its intake year, name and counts, opening the batch; Edit and Delete beside it. */
+function BatchRow({
+  batch,
+  counts,
+  onEdit,
+  onDelete,
+}: {
+  batch: BatchDetail;
+  counts: BatchCounts;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const href = `/admin/batches/${encodeURIComponent(batch.name)}`;
+  // "Batch 2026" already says its year; a named batch shows it underneath.
+  const showYear = batch.year !== null && batch.name !== String(batch.year);
+  return (
+    <Card className="flex flex-col gap-3 p-4 transition-colors hover:border-gold md:flex-row md:items-center md:gap-4 md:px-5">
+      <Link href={href} className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center md:gap-4">
+        <span className="flex min-w-0 flex-1 items-center gap-4">
+          <span className="shrink-0 rounded-md bg-gold-soft px-3 py-1.5 font-heading text-sm font-extrabold tabular-nums text-foreground">
+            {batch.year ?? "—"}
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate font-heading text-base font-bold">Batch {batch.name}</span>
+            {showYear ? <span className="text-sm text-muted-foreground">Batch year {batch.year}</span> : null}
+          </span>
+        </span>
+        <span className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+          <Stat icon={LayoutList} label={plural(counts.sections, "section")} />
+          <Stat icon={Layers} label={plural(counts.diplomas, "diploma")} />
+          <Stat icon={Users} label={plural(counts.students, "student")} />
+          <ChevronRight className="hidden size-4 md:block" aria-hidden />
+        </span>
+      </Link>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-gold/40 bg-gold-soft text-foreground hover:bg-gold-soft hover:brightness-95"
+          onClick={onEdit}
+        >
+          <Pencil /> Edit
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-destructive-border bg-destructive-soft text-destructive hover:border-destructive hover:bg-destructive-soft hover:text-destructive"
+          disabled={counts.students > 0}
+          title={counts.students > 0 ? `Move or remove its ${plural(counts.students, "student")} first` : undefined}
+          onClick={onDelete}
+        >
+          <Trash2 /> Delete
+        </Button>
+      </div>
+    </Card>
+  );
+}
 
 /** Intake batches: the fixed yearly ones plus any added by an admin. */
 export default function BatchesPage() {
   const query = useBatches();
-  const departments = useDepartments().data?.departments ?? [];
   const [editing, setEditing] = useState<BatchDetail | "new" | null>(null);
   const [deleting, setDeleting] = useState<BatchDetail | null>(null);
   const [pending, setPending] = useState(false);
 
   return (
     <QueryView query={query} loading={<AdminLoading />}>
-      {({ details }) => (
+      {({ details, counts }) => (
         <PageContainer>
           <SectionHeader
             title="Batches"
-            description="A new batch starts every Fall. Each batch has its own sections in every diploma."
+            description={`${details.length} ${details.length === 1 ? "batch" : "batches"} · a new batch opens every September`}
             breadcrumbs={[{ label: "Batches" }]}
             actions={
               <Button onClick={() => setEditing("new")}>
@@ -40,33 +109,16 @@ export default function BatchesPage() {
           {details.length === 0 ? (
             <EmptyState icon={CalendarRange} title="No batches yet" />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {details.map((batch) => {
-                const sections = departments.flatMap((d) => d.sections.filter((s) => s.batch === batch.name));
-                const students = sections.reduce((n, s) => n + s._count.students, 0);
-                return (
-                  <Card key={batch.name} className="flex flex-col gap-3 p-4">
-                    <Link href={`/admin/batches/${encodeURIComponent(batch.name)}`} className="flex items-center justify-between">
-                      <span className="flex flex-col">
-                        <span className="font-heading text-lg font-bold">Batch {batch.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {batch.year ? `Fall ${batch.year} intake` : "No intake year"} · {sections.length} sections ·{" "}
-                          {students} students
-                        </span>
-                      </span>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </Link>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setEditing(batch)}>
-                        <Pencil /> Edit
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setDeleting(batch)}>
-                        <Trash2 /> Delete
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
+            <div className="flex flex-col gap-3">
+              {details.map((batch) => (
+                <BatchRow
+                  key={batch.name}
+                  batch={batch}
+                  counts={counts[batch.name] ?? NO_COUNTS}
+                  onEdit={() => setEditing(batch)}
+                  onDelete={() => setDeleting(batch)}
+                />
+              ))}
             </div>
           )}
           <BatchDialog

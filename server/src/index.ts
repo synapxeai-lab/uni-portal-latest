@@ -1,6 +1,7 @@
 import { env } from "@/config/env";
 import { prisma } from "@/lib/prisma";
 import { startScheduledPublishWorker } from "@/features/scheduling/publish-worker";
+import { startYearlyBatchWorker } from "@/features/academics/yearly-batch-worker";
 import { warmUp } from "@/lib/warm-up";
 
 import { createApp } from "./app";
@@ -17,6 +18,9 @@ await warmUp();
 if (env.SCHEDULED_PUBLISH_WORKER) {
   startScheduledPublishWorker();
 }
+
+// Sections A and B for each diploma when a new yearly batch opens on 1 September.
+startYearlyBatchWorker();
 
 const server = app.listen(env.PORT, () => {
   console.log(`API listening on http://localhost:${env.PORT}`);

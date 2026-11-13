@@ -3,11 +3,13 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
+import { getAllBatches } from "../lib/batches";
 import { withCourseStatus } from "../lib/course-status";
 import { archiveOfferingsWhere } from "../lib/offering-classrooms";
 import { applyDiscount, courseTotalFee, discountRateField } from "../lib/fee";
 import { conflictError, notFoundError } from "../lib/http";
 import { categoryKeyField } from "../lib/programme-categories";
+import { createDefaultSections, syncStudentsForNewSection } from "../lib/section-sync";
 import { withCurrentDiplomas } from "../lib/terms";
 
 const semesterField = z
@@ -162,7 +164,17 @@ export async function createDepartment(input: z.infer<typeof createDepartmentSch
   } else {
     await assertSemesterFree(input.category, semester);
   }
-  const department = await prisma.department.create({ data: { ...input, semester } });
+  // A new diploma starts with Sections A and B in every batch, saved together with it.
+  const batches = await getAllBatches();
+  const department = await prisma.$transaction(async (tx) => {
+    const created = await tx.department.create({ data: { ...input, semester } });
+    await createDefaultSections(tx, [created.id], batches);
+    return created;
+  });
+  // Students already in this programme and batch join the section matching theirs.
+  for (const section of await prisma.section.findMany({ where: { departmentId: department.id } })) {
+    await syncStudentsForNewSection(section);
+  }
   return getDepartment(department.id);
 }
 

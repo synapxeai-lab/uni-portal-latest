@@ -59,8 +59,11 @@ structureRouter.delete("/programme-categories/:id", requireAdmin, async (req, re
 // ---- Batches ------------------------------------------------------------------------
 
 structureRouter.get("/batches", async (_req, res) => {
-  const details = await read("batches", getBatchDetails);
-  res.json({ batches: details.map((batch) => batch.name), details });
+  const [details, counts] = await Promise.all([
+    read("batches", getBatchDetails),
+    read("batches:counts", batchService.batchCounts),
+  ]);
+  res.json({ batches: details.map((batch) => batch.name), details, counts });
 });
 
 structureRouter.post("/batches", requireAdmin, async (req, res) => {
@@ -105,7 +108,7 @@ structureRouter.post("/departments", requireAdmin, async (req, res) => {
     await parseInputAsync(departmentService.createDepartmentSchema, req.body),
   );
   invalidateUniversity();
-  done(res, { department, message: "Diploma created." }, 201);
+  done(res, { department, message: "Diploma created with Sections A and B in every batch." }, 201);
 });
 
 structureRouter.put("/departments/:id", requireAdmin, async (req, res) => {

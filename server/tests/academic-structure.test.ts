@@ -60,6 +60,7 @@ describe("academic structure API", () => {
   let category: Category;
   let first: Department;
   let second: Department;
+  let late: Department | undefined;
   const batch = unique("B").slice(0, 12);
   const otherBatch = unique("C").slice(0, 12);
   // Intake years no real batch uses, so each test batch has its year to itself.
@@ -72,7 +73,7 @@ describe("academic structure API", () => {
 
   afterAll(async () => {
     // Clean up everything this file created.
-    for (const department of [first, second]) {
+    for (const department of [late, first, second]) {
       if (department) {
         await admin.delete(`/departments/${department.id}`);
       }
@@ -185,6 +186,24 @@ describe("academic structure API", () => {
 
     const list = await admin.get<{ details: { name: string; year: number }[] }>("/batches");
     expect(list.data.details).toContainEqual({ name: batch, year });
+  });
+
+  it("gives a diploma added later Sections A and B in every existing batch", async () => {
+    const created = await admin.post<{ department: Department }>("/departments", {
+      color: "#000",
+      bg: "#fff",
+      description: "d",
+      head: "h",
+      category: category.key,
+      name: unique("Diploma Late"),
+      code: unique("DL"),
+    });
+    expect(created.status).toBe(201);
+    late = created.data.department;
+    const { sections } = (await admin.get<{ department: Department }>(`/departments/${late.id}`)).data.department;
+    const labelsIn = (b: string) => sections.filter((s) => s.batch === b).map((s) => s.label).sort();
+    expect(labelsIn(batch)).toEqual(["A", "B"]);
+    expect(labelsIn("2026")).toEqual(["A", "B"]);
   });
 
   it("allows only one batch per intake year", async () => {

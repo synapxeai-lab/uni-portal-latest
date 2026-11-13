@@ -1,7 +1,7 @@
-import type { Section } from "@/generated/prisma/client";
+import type { Prisma, Section } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
-import { DEFAULT_SECTION_LABELS } from "./batches";
+import { DEFAULT_SECTION_LABELS, getAllBatches, getYearlyBatches } from "./batches";
 
 /**
  * `Student.section` is the label typed on the student form; it doesn't by
@@ -93,4 +93,45 @@ export async function ensureDefaultSections(departmentIds: number[], batches: st
     await syncStudentsForNewSection(await prisma.section.create({ data }));
   }
   return missing.length;
+}
+
+type SectionWriter = Pick<Prisma.TransactionClient, "section">;
+
+/**
+ * The default Sections A and B for each given diploma in each given batch,
+ * inside the caller's transaction; existing ones are skipped. Doesn't link
+ * students (see syncStudentsForNewSection) - for a brand-new batch there are
+ * none to link.
+ */
+export async function createDefaultSections(tx: SectionWriter, departmentIds: number[], batches: string[]) {
+  const { count } = await tx.section.createMany({
+    data: departmentIds.flatMap((departmentId) =>
+      batches.flatMap((batch) => DEFAULT_SECTION_LABELS.map((label) => ({ departmentId, batch, label }))),
+    ),
+    skipDuplicates: true,
+  });
+  return count;
+}
+
+/**
+ * A yearly batch appears by itself on 1 September; when one has no sections
+ * at all yet, every diploma gets Sections A and B in it. A batch that already
+ * has any section is left alone, so sections an admin removed stay removed.
+ * Returns how many sections were created.
+ */
+export async function ensureYearlyBatchSections(): Promise<number> {
+  const yearly = (await getAllBatches()).filter((batch) => getYearlyBatches().includes(batch));
+  if (yearly.length === 0) {
+    return 0;
+  }
+  const started = await prisma.section.groupBy({ by: ["batch"], where: { batch: { in: yearly } } });
+  const empty = yearly.filter((batch) => !started.some((s) => s.batch === batch));
+  if (empty.length === 0) {
+    return 0;
+  }
+  const departments = await prisma.department.findMany({ select: { id: true } });
+  return ensureDefaultSections(
+    departments.map((d) => d.id),
+    empty,
+  );
 }

@@ -6,6 +6,7 @@ import { apiAction, apiGet } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
 
 import type {
+  BatchCounts,
   BatchDetail,
   Course,
   CourseDetail,
@@ -61,7 +62,8 @@ export function queryString(params: Record<string, string | number | undefined |
 export const useProgrammeCategories = () =>
   useUniversityQuery<{ categories: ProgrammeCategory[] }>("/programme-categories");
 
-export const useBatches = () => useUniversityQuery<{ batches: string[]; details: BatchDetail[] }>("/batches");
+export const useBatches = () =>
+  useUniversityQuery<{ batches: string[]; details: BatchDetail[]; counts: Record<string, BatchCounts> }>("/batches");
 
 export const useDepartments = (params: { category?: string; search?: string } = {}) =>
   useUniversityQuery<{ departments: Department[] }>(`/departments${queryString(params)}`, {
