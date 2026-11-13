@@ -60,6 +60,7 @@ export default function SettingsPage() {
               <SectionHeader
                 title="Platform settings"
                 description="Platform-wide configuration. Changes apply immediately."
+                back={false}
               />
               <SettingsForm settings={settings} />
             </section>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, ClipboardList, Link2, Plus, Scale, Trash2 } from "lucide-react";
+import { ChevronRight, ClipboardList, Link2, Plus, Scale, Trash2 } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
@@ -444,17 +444,12 @@ function Marksheet({ sheet, row, path, isAdmin }: { sheet: Sheet; row: StudentRo
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`${BASE}/${path}`}>
-            <ChevronLeft /> All students
-          </Link>
-        </Button>
-        <div className="flex gap-2">
+        <div className="ml-auto flex gap-2">
           <Button variant="outline" size="sm" disabled={!previous} asChild={Boolean(previous)}>
-            {previous ? <Link href={`${BASE}/${path}/${previous.enrollmentId}`}>Previous</Link> : <span>Previous</span>}
+            {previous ? <Link replace href={`${BASE}/${path}/${previous.enrollmentId}`}>Previous</Link> : <span>Previous</span>}
           </Button>
           <Button variant="outline" size="sm" disabled={!next} asChild={Boolean(next)}>
-            {next ? <Link href={`${BASE}/${path}/${next.enrollmentId}`}>Next</Link> : <span>Next</span>}
+            {next ? <Link replace href={`${BASE}/${path}/${next.enrollmentId}`}>Next</Link> : <span>Next</span>}
           </Button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Outlet, useOutletContext } from "react-router";
 import { FolderX } from "lucide-react";
 
+import { BackButton } from "@/components/page/back-button";
 import { PageContainer } from "@/components/page/page-container";
 import { EmptyState } from "@/components/states/empty-state";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export default function ClassroomLayout() {
         <div className="flex flex-col">
           <ClassroomHeader classroom={data} />
           <PageContainer className="gap-4">
+            <BackButton fallback="/classes" />
             <ClassroomTabs classroomId={data.id} />
             <Suspense fallback={<ClassroomTabLoading />}>
               <Outlet context={data} />

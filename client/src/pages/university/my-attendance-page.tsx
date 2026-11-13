@@ -1,4 +1,4 @@
-import { CalendarCheck, CalendarX2, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarCheck, CalendarX2, ChevronRight } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
@@ -6,7 +6,6 @@ import { EmptyState } from "@/components/states/empty-state";
 import { AppLoading } from "@/app/layouts";
 import { QueryView } from "@/app/route-states";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useParams, useRouter } from "@/lib/navigation";
@@ -103,16 +102,9 @@ function HistoryView({ course }: { course: Course }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <Button variant="outline" size="sm" className="w-fit" asChild>
-            <Link href={BASE}>
-              <ChevronLeft /> All courses
-            </Link>
-          </Button>
-          <h2 className="font-heading text-base font-bold">
-            {course.code} {course.name} · Section {course.section.label}
-          </h2>
-        </div>
+        <h2 className="font-heading text-base font-bold">
+          {course.code} {course.name} · Section {course.section.label}
+        </h2>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span className="tabular-nums">
             {attended} / {course.summary.total} days attended

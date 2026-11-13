@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { CalendarCheck, CalendarPlus, CalendarX2, ChevronLeft } from "lucide-react";
+import { CalendarCheck, CalendarPlus, CalendarX2 } from "lucide-react";
 
+import { useGoBack } from "@/components/page/back-button";
 import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
 import { EmptyState } from "@/components/states/empty-state";
@@ -105,7 +106,8 @@ function DaysView({ data, path }: { data: AttendanceData; path: string }) {
 function DaySheet({ data, path, date }: { data: AttendanceData; path: string; date: string }) {
   const [marks, setMarks] = useState<Record<number, Status>>({});
   const [saving, setSaving] = useState(false);
-  const router = useRouter();
+  // Saved: back to where the sheet was opened from (the days list).
+  const goBack = useGoBack(`${BASE}/${path}`);
 
   // Start from what's saved for this day.
   useEffect(() => {
@@ -123,20 +125,13 @@ function DaySheet({ data, path, date }: { data: AttendanceData; path: string; da
       }),
     );
     setSaving(false);
-    if (ok) router.push(`${BASE}/${path}`);
+    if (ok) goBack();
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <Button variant="outline" size="sm" className="w-fit" asChild>
-            <Link href={`${BASE}/${path}`}>
-              <ChevronLeft /> Days taken
-            </Link>
-          </Button>
-          <h2 className="font-heading text-base font-bold">{longDate(date)}</h2>
-        </div>
+        <h2 className="font-heading text-base font-bold">{longDate(date)}</h2>
         <Button
           variant="outline"
           disabled={data.roster.length === 0}
