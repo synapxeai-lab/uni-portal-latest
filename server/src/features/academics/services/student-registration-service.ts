@@ -170,7 +170,14 @@ function toOffered(
     code: course.code,
     name: course.name,
     creditHours: course.creditHours,
-    department: { id: course.department.id, code: course.department.code, name: course.department.name, semester: course.department.semester },
+    department: {
+      id: course.department.id,
+      code: course.department.code,
+      name: course.department.name,
+      semester: course.department.semester,
+      color: course.department.color,
+      bg: course.department.bg,
+    },
     sections,
     // The section named on the student's record, else their own section, else the first.
     defaultSectionId:
