@@ -37,6 +37,8 @@ const SubmissionReviewPage = lazy(() => import("@/pages/classes/submission-revie
 const ProgrammesPage = lazy(() => import("@/pages/university/programmes-page"));
 const ProgrammePage = lazy(() => import("@/pages/university/programme-page"));
 const DiplomaPage = lazy(() => import("@/pages/university/diploma-page"));
+const DiplomaSectionsPage = lazy(() => import("@/pages/university/diploma-sections-page"));
+const DiplomaCoursesPage = lazy(() => import("@/pages/university/diploma-courses-page"));
 const CoursesPage = lazy(() => import("@/pages/university/courses-page"));
 const CoursePage = lazy(() => import("@/pages/university/course-page"));
 const BatchesPage = lazy(() => import("@/pages/university/batches-page"));
@@ -128,6 +130,8 @@ export function AppRoutes() {
           <Route path="programmes" element={<ProgrammesPage />} />
           <Route path="programmes/:slug" element={<ProgrammePage />} />
           <Route path="diplomas/:id" element={<DiplomaPage />} />
+          <Route path="diplomas/:id/sections" element={<DiplomaSectionsPage />} />
+          <Route path="diplomas/:id/courses" element={<DiplomaCoursesPage />} />
           <Route path="courses" element={<CoursesPage />} />
           <Route path="courses/:id" element={<CoursePage />} />
           <Route path="batches" element={<BatchesPage />} />

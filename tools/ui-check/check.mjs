@@ -50,6 +50,8 @@ const DEFAULT_PAGES = {
     "/admin/programmes",
     "/admin/programmes/{programmeSlug}",
     "/admin/diplomas/{departmentId}",
+    "/admin/diplomas/{departmentId}/sections",
+    "/admin/diplomas/{departmentId}/courses",
     "/admin/courses",
     "/admin/courses/{courseId}",
     "/admin/batches",

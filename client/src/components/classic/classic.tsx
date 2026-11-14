@@ -535,3 +535,62 @@ export function BlockHeading({ meta, className, children }: { meta?: ReactNode; 
     </h3>
   );
 }
+
+/**
+ * .dept-detail-header: a card with a coloured left edge and a tile (code or
+ * initials) in the item's colours, then title, subtitle and a meta row.
+ */
+export function DetailHeader({
+  tile,
+  color,
+  bg,
+  title,
+  subtitle,
+  meta,
+  action,
+}: {
+  tile: ReactNode;
+  color?: string;
+  bg?: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  meta?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      className="mb-6 flex gap-[1.1rem] rounded-[10px] border border-l-4 border-border bg-card p-[1.35rem] shadow-[0_1px_2px_rgba(23,31,50,.05)] max-[480px]:flex-col max-[480px]:p-[1.1rem]"
+      style={{ borderLeftColor: bg }}
+    >
+      <div
+        className="flex h-[52px] min-w-[52px] shrink-0 items-center justify-center self-start whitespace-nowrap rounded-md px-[0.6rem] text-[0.9rem] font-extrabold"
+        style={{ background: bg, color }}
+      >
+        {tile}
+      </div>
+      <div className="min-w-0 flex-1">
+        <h1 className="mb-[0.35rem] font-heading text-[1.25rem] font-extrabold text-foreground">{title}</h1>
+        {subtitle ? <p className="mb-[0.6rem] text-[0.8rem] text-muted-foreground">{subtitle}</p> : null}
+        {meta ? (
+          <div className="flex flex-wrap items-center gap-5 text-[0.78rem] text-muted-foreground [&>span]:inline-flex [&>span]:items-center [&>span]:gap-[0.35rem] [&_svg]:size-[13px]">
+            {meta}
+          </div>
+        ) : null}
+      </div>
+      {action ? <div className="shrink-0 self-start">{action}</div> : null}
+    </div>
+  );
+}
+
+/** .page-header: title + muted subtitle on the left, the main action on the right. */
+export function ClassicPageHeader({ title, subtitle, action }: { title: ReactNode; subtitle?: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 className="mb-[0.2rem] font-heading text-[1.25rem] font-extrabold text-foreground">{title}</h1>
+        {subtitle ? <p className="text-[0.8rem] text-muted-foreground">{subtitle}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}

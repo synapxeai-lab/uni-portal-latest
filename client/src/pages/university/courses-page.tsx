@@ -1,165 +1,165 @@
 import { useState } from "react";
-import { BookOpen, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ClipboardList, Clock, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
-import { SectionHeader } from "@/components/page/section-header";
-import { EmptyState } from "@/components/states/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
+import { ListSkeleton } from "@/components/states/skeletons";
 import Link from "@/components/ui/link";
-import { Select } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AdminLoading } from "@/app/layouts";
+import {
+  ClassicButton,
+  ClassicConfirm,
+  ClassicPageHeader,
+  FilterPills,
+  RowButton,
+  SearchBox,
+  StatusPill,
+  TableEmpty,
+} from "@/components/classic/classic";
 import { QueryView } from "@/app/route-states";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import {
-  universityAction,
-  useCourses,
-  useDepartments,
-  useProgrammeCategories,
-} from "@/features/academics/api";
-import { CourseDialog } from "@/features/academics/components/structure-dialogs";
-import { formatRs, ordinal, runAction, TableCard } from "@/features/academics/components/ui";
+import { cn } from "@/lib/utils";
+import { universityAction, useCourses, useDepartments, useProgrammeCategories } from "@/features/academics/api";
+import { ClassicCourseModal, ClassicSchemeModal, FeeAmount } from "@/features/academics/components/classic-course-modals";
+import { ordinal, runAction } from "@/features/academics/components/ui";
 import type { Course } from "@/features/academics/types";
 
-/** Every course across all diplomas, filterable by programme, semester and status. */
+/**
+ * Courses (admin): an exact replica of the old University Portal's Courses
+ * page - search, programme pills and one row per course (diploma, semester,
+ * fee, theory/practical split, status, credits) with Assessments / Edit / Delete.
+ */
+
+// "Culinary Programmes" -> "Culinary".
+const shortProgrammeLabel = (label: string) => label.replace(/ Programmes?$/i, "");
+
 export default function CoursesPage() {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [semester, setSemester] = useState("");
-  const [status, setStatus] = useState("");
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const query = useCourses({ search: debouncedSearch, category, semester, status });
+  const [programme, setProgramme] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const query = useCourses({ search: debouncedSearch, category: programme });
   const categories = useProgrammeCategories().data?.categories ?? [];
   const departments = useDepartments().data?.departments ?? [];
-  const semesters = [...new Set(departments.filter((d) => !category || d.category === category).map((d) => d.semester))].sort(
-    (a, b) => a - b,
-  );
-  const [editing, setEditing] = useState<Course | "new" | null>(null);
+  const courses = query.data?.courses ?? [];
+
+  const [modal, setModal] = useState<Course | "new" | null>(null);
+  const [scheme, setScheme] = useState<Course | null>(null);
   const [deleting, setDeleting] = useState<Course | null>(null);
-  const [pending, setPending] = useState(false);
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    const course = deleting;
+    setDeleting(null);
+    await runAction(universityAction("delete", `/courses/${course.id}`), `Course ${course.name} deleted.`);
+  }
 
   return (
-    <PageContainer>
-      <SectionHeader
+    <PageContainer className="gap-0">
+      <ClassicPageHeader
         title="Courses"
-        description="Every course across all diplomas, with its fee and whether it's offered."
-        breadcrumbs={[{ label: "Courses" }]}
-        actions={
-          <Button onClick={() => setEditing("new")}>
-            <Plus /> Add course
-          </Button>
+        subtitle={`${courses.length} courses across ${departments.length} departments`}
+        action={
+          <ClassicButton onClick={() => setModal("new")}>
+            <Plus className="size-4" /> Add Course
+          </ClassicButton>
         }
       />
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Input placeholder="Search name or code" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search courses" />
-        <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Programme">
-          <option value="">All programmes</option>
-          {categories.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </Select>
-        <Select value={semester} onChange={(e) => setSemester(e.target.value)} aria-label="Semester">
-          <option value="">All semesters</option>
-          {semesters.map((s) => (
-            <option key={s} value={s}>
-              {ordinal(s)} semester
-            </option>
-          ))}
-        </Select>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
-          <option value="">Offered or not</option>
-          <option value="ACTIVE">Offered</option>
-          <option value="INACTIVE">Not offered</option>
-        </Select>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <SearchBox value={search} onChange={setSearch} placeholder="Search by course name or code…" />
+      </div>
+      <div className="mb-4">
+        <FilterPills
+          label="Programme"
+          value={programme}
+          onChange={setProgramme}
+          options={[{ value: "", label: "All" }, ...categories.map((c) => ({ value: c.key, label: shortProgrammeLabel(c.label) }))]}
+        />
       </div>
 
-      <QueryView query={query} loading={<AdminLoading />}>
-        {({ courses }) =>
-          courses.length === 0 ? (
-            <EmptyState icon={BookOpen} title="No courses found" description="Try another filter, or add a course." />
-          ) : (
-            <TableCard>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Course</TableHead>
-                    <TableHead>Diploma</TableHead>
-                    <TableHead className="text-right">Credits</TableHead>
-                    <TableHead className="text-right">Total fee</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-0" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {courses.map((course) => (
-                    <TableRow key={course.id}>
-                      <TableCell className="font-mono text-xs">{course.code}</TableCell>
-                      <TableCell>
-                        <Link href={`/admin/courses/${course.id}`} className="font-semibold">
-                          {course.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/admin/diplomas/${course.departmentId}`} className="text-sm">
-                          {course.department?.code}
-                        </Link>
-                        <span className="ml-1 text-xs text-muted-foreground">
-                          · {course.department ? ordinal(course.department.semester) : ""}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{course.creditHours}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatRs(course.totalFee ?? course.fee)}</TableCell>
-                      <TableCell>
-                        <Badge variant={course.status === "ACTIVE" ? "success" : "secondary"}>
-                          {course.status === "ACTIVE" ? "Offered" : "Not offered"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" aria-label="Edit course" onClick={() => setEditing(course)}>
-                            <Pencil />
-                          </Button>
-                          <Button variant="ghost" size="icon" aria-label="Delete course" onClick={() => setDeleting(course)}>
-                            <Trash2 />
-                          </Button>
+      <QueryView query={query} loading={<ListSkeleton rows={7} />}>
+        {() => (
+          <div className={cn("flex flex-col gap-[0.6rem]", query.isPlaceholderData && "opacity-60 transition-opacity")}>
+            {courses.length === 0 ? (
+              <TableEmpty>No courses match your filters.</TableEmpty>
+            ) : (
+              courses.map((c) => {
+                const dept = c.department;
+                const active = c.status === "ACTIVE";
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-[0.9rem] rounded-md border border-border bg-card px-4 py-[0.85rem] shadow-[0_1px_2px_rgba(23,31,50,.05)] transition-[box-shadow,border-color] hover:border-border-strong hover:shadow-[0_2px_8px_rgba(23,31,50,.07)] max-[720px]:flex-wrap"
+                  >
+                    {/* .course-row-main: the whole left part opens the course. */}
+                    <Link
+                      href={`/admin/courses/${c.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-[0.9rem] max-[720px]:order-1 max-[720px]:basis-full max-[720px]:flex-wrap"
+                    >
+                      <div
+                        className="shrink-0 rounded-md px-[0.55rem] py-[0.3rem] text-[0.72rem] font-bold tracking-[0.03em]"
+                        style={{ color: dept?.color, background: dept?.bg }}
+                      >
+                        {c.code}
+                      </div>
+                      <div className="min-w-0 flex-1 max-[720px]:basis-full">
+                        <p className="text-[0.87rem] font-semibold text-foreground">{c.name}</p>
+                        <div className="mt-[0.2rem] flex flex-wrap items-center gap-[0.6rem]">
+                          <span
+                            className="inline-block max-w-full whitespace-nowrap rounded-xl px-2 py-[0.12rem] text-[0.68rem] font-bold"
+                            style={{ color: dept?.color, background: dept?.bg }}
+                          >
+                            {dept?.name}
+                          </span>
+                          {dept ? (
+                            <span className="whitespace-nowrap text-[0.74rem] text-muted-foreground">{ordinal(dept.semester)} Semester</span>
+                          ) : null}
+                          <FeeAmount fee={c.totalFee ?? c.fee} discountRate={c.discountRate} />
+                          <span className="whitespace-nowrap text-[0.74rem] text-muted-foreground">
+                            {c.assessmentScheme?.length
+                              ? `Theory ${c.theoryPercent}% · Practical ${100 - c.theoryPercent}%`
+                              : "No assessments defined"}
+                          </span>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableCard>
-          )
-        }
+                      </div>
+                      <StatusPill tone={active ? "success" : "muted"}>{active ? "Active" : "Inactive"}</StatusPill>
+                      <div className="inline-flex shrink-0 items-center gap-[0.3rem] whitespace-nowrap text-xs font-semibold text-mid-foreground">
+                        <Clock className="size-[13px]" aria-hidden /> {c.creditHours} CR
+                      </div>
+                      <ChevronRight className="size-4 shrink-0 text-border-strong" aria-hidden />
+                    </Link>
+                    {/* .course-actions */}
+                    <div className="flex shrink-0 gap-[0.4rem] max-[720px]:order-2 max-[720px]:ml-auto">
+                      <RowButton
+                        kind="edit"
+                        icon={ClipboardList}
+                        label="Assessments"
+                        title="Theory/practical split and assessments"
+                        onClick={() => setScheme(c)}
+                      />
+                      <RowButton kind="edit" icon={Pencil} label="Edit" title="Edit course" onClick={() => setModal(c)} />
+                      <RowButton kind="delete" icon={Trash2} label="Delete" title="Delete course" onClick={() => setDeleting(c)} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </QueryView>
 
-      <CourseDialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
-        course={editing === "new" || editing === null ? undefined : editing}
-        departments={departments}
-      />
-      <ConfirmDialog
+      {modal ? (
+        <ClassicCourseModal
+          departments={departments}
+          categories={categories}
+          course={modal === "new" ? undefined : modal}
+          onClose={() => setModal(null)}
+        />
+      ) : null}
+      {scheme ? <ClassicSchemeModal course={scheme} onClose={() => setScheme(null)} /> : null}
+      <ClassicConfirm
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title="Delete course?"
-        description={deleting ? `Delete ${deleting.code} - ${deleting.name}? Its registrations, attendance and marks are deleted too.` : ""}
-        confirmLabel="Delete"
-        destructive
-        pending={pending}
-        onConfirm={async () => {
-          if (!deleting) return;
-          setPending(true);
-          await runAction(universityAction("delete", `/courses/${deleting.id}`));
-          setPending(false);
-          setDeleting(null);
-        }}
+        title="Delete Course"
+        message={`Are you sure you want to delete "${deleting?.name}" (${deleting?.code})? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
       />
     </PageContainer>
   );
