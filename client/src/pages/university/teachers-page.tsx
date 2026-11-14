@@ -1,151 +1,295 @@
-import { useState } from "react";
-import { Pencil, Plus, Trash2, UserRound } from "lucide-react";
+import { useMemo, useState } from "react";
+import { GraduationCap, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
-import { SectionHeader } from "@/components/page/section-header";
-import { EmptyState } from "@/components/states/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
+import { ListSkeleton } from "@/components/states/skeletons";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AdminLoading } from "@/app/layouts";
+import {
+  ClassicButton,
+  ClassicConfirm,
+  ClassicPageHeader,
+  ColorPill,
+  DetailsModal,
+  FilterPills,
+  RowButton,
+  SearchBox,
+  StatusPill,
+  TableEmpty,
+  type FilterOption,
+} from "@/components/classic/classic";
 import { QueryView } from "@/app/route-states";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import {
-  queryString,
-  universityAction,
-  useProgrammeCategories,
-  useProgrammeLookup,
-  useUniversityQuery,
-} from "@/features/academics/api";
-import {
-  LoginCreatedDialog,
-  TeacherDialog,
-  type CreatedLogin,
-  type TeacherRecord,
-} from "@/features/academics/components/people-dialogs";
-import { formatRs, runAction, TableCard } from "@/features/academics/components/ui";
+import { cn } from "@/lib/utils";
+import { queryString, universityAction, useProgrammeCategories, useUniversityQuery } from "@/features/academics/api";
+import { ClassicTeacherModal, payRateText, teacherTypeByKey } from "@/features/academics/components/classic-teacher-modal";
+import { LoginCreatedDialog, type CreatedLogin, type TeacherRecord } from "@/features/academics/components/people-dialogs";
+import { runAction, TableCard } from "@/features/academics/components/ui";
+import type { ProgrammeCategory } from "@/features/academics/types";
 
-/** Teachers: profile, programme, pay type and what they teach. */
+/**
+ * Teachers (admin): an exact replica of the old University Portal's Teachers
+ * page - search, programme pills with counts, and a table whose rows open the
+ * teacher's details.
+ */
+
+const shortProgrammeLabel = (label: string) => label.replace(/ Programmes?$/i, "");
+const muted = "whitespace-nowrap text-[0.8rem] text-muted-foreground";
+
+function ProgrammeBadge({ category, short }: { category?: ProgrammeCategory; short?: boolean }) {
+  if (!category) return null;
+  return (
+    <ColorPill color={category.color} bg={category.bg}>
+      {short ? shortProgrammeLabel(category.label) : category.label}
+    </ColorPill>
+  );
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const t = teacherTypeByKey(type);
+  return (
+    <ColorPill color={t.color} bg={t.bg}>
+      {t.label}
+    </ColorPill>
+  );
+}
+
+/** A teacher without an active login can't sign in: flagged under their name. */
+function LoginFlag({ teacher }: { teacher: TeacherRecord }) {
+  if (teacher.user?.status === "ACTIVE") return null;
+  return (
+    <span className="mt-1 block w-fit">
+      <StatusPill tone={teacher.user ? "muted" : "warning"}>{teacher.user ? teacher.user.status.toLowerCase() : "No login"}</StatusPill>
+    </span>
+  );
+}
+
+function TeacherDetails({
+  teacher: t,
+  category,
+  onEdit,
+  onClose,
+}: {
+  teacher: TeacherRecord;
+  category?: ProgrammeCategory;
+  onEdit: () => void;
+  onClose: () => void;
+}) {
+  const assignments = t.sectionCourses;
+  return (
+    <DetailsModal
+      title={t.name}
+      subtitle={t.qualification}
+      badge={<ProgrammeBadge category={category} />}
+      sections={[
+        {
+          heading: "Personal Information",
+          fields: [
+            ["Full Name", t.name],
+            ["CNIC", t.cnic],
+            ["Qualification", t.qualification],
+            ["Programme", category?.label],
+          ],
+        },
+        {
+          heading: "Employment",
+          fields: [
+            ["Teacher Type", teacherTypeByKey(t.type).label],
+            [t.type === "VISITING" ? "Rate" : "Salary", payRateText(t) ?? "Not set"],
+          ],
+        },
+        {
+          heading: "Contact",
+          fields: [
+            ["Email", t.email],
+            ["Phone", t.phone],
+            ["Address", t.address],
+          ],
+        },
+        {
+          heading: "Guardian",
+          fields: [
+            ["Guardian Name", t.guardianName],
+            ["Guardian Contact", t.guardianContact],
+            ["Guardian CNIC", t.guardianCnic],
+          ],
+        },
+        {
+          heading: `Teaching Assignments (${assignments.length})`,
+          fields: [
+            [
+              "Courses & Sections",
+              assignments.length === 0 ? (
+                "No course assigned"
+              ) : (
+                <ul className="m-0 grid list-disc gap-[0.3rem] pl-[1.1rem]">
+                  {assignments.map((sc) => (
+                    <li key={sc.id}>
+                      <strong>{sc.course.code}</strong> — {sc.course.name}
+                      <span className={muted}>
+                        {" "}
+                        · Section {sc.section.label}, Batch {sc.section.batch}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ),
+            ],
+          ],
+        },
+      ]}
+      onEdit={onEdit}
+      onClose={onClose}
+    />
+  );
+}
+
 export default function TeachersPage() {
   const [search, setSearch] = useState("");
-  const debounced = useDebouncedValue(search, 300);
+  const [programme, setProgramme] = useState("");
+  const debounced = useDebouncedValue(search.trim(), 300);
   const query = useUniversityQuery<{ teachers: TeacherRecord[] }>(`/teachers${queryString({ search: debounced })}`, {
     keepPrevious: true,
   });
   const categories = useProgrammeCategories().data?.categories ?? [];
-  const programmeOf = useProgrammeLookup();
-  const [editing, setEditing] = useState<TeacherRecord | "new" | null>(null);
+  const categoryOf = (key: string) => categories.find((c) => c.key === key);
+  const teachers = useMemo(() => query.data?.teachers ?? [], [query.data]);
+  const filtered = programme ? teachers.filter((t) => t.programme === programme) : teachers;
+
+  const [modal, setModal] = useState<TeacherRecord | "new" | null>(null);
+  const [viewing, setViewing] = useState<TeacherRecord | null>(null);
   const [deleting, setDeleting] = useState<TeacherRecord | null>(null);
   const [login, setLogin] = useState<CreatedLogin | null>(null);
-  const [pending, setPending] = useState(false);
+
+  const programmeOptions: FilterOption[] = [
+    { value: "", label: "All", count: teachers.length },
+    ...categories.map((c) => ({
+      value: c.key,
+      label: shortProgrammeLabel(c.label),
+      count: teachers.filter((t) => t.programme === c.key).length,
+    })),
+  ];
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    const teacher = deleting;
+    setDeleting(null);
+    await runAction(universityAction("delete", `/teachers/${teacher.id}`), `Teacher ${teacher.name} deleted.`);
+  }
 
   return (
-    <PageContainer>
-      <SectionHeader
+    <PageContainer className="gap-0">
+      <ClassicPageHeader
         title="Teachers"
-        description="Every teacher has a login; what they teach is set from Offer courses."
-        breadcrumbs={[{ label: "Teachers" }]}
-        actions={
-          <Button onClick={() => setEditing("new")}>
-            <Plus /> Add teacher
-          </Button>
+        subtitle={`${filtered.length} teacher${filtered.length === 1 ? "" : "s"}`}
+        action={
+          <ClassicButton onClick={() => setModal("new")}>
+            <Plus className="size-4" /> Add Teacher
+          </ClassicButton>
         }
       />
-      <Input
-        className="sm:max-w-sm"
-        placeholder="Search name or email"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        aria-label="Search teachers"
-      />
-      <QueryView query={query} loading={<AdminLoading />}>
-        {({ teachers }) =>
-          teachers.length === 0 ? (
-            <EmptyState icon={UserRound} title="No teachers found" />
-          ) : (
-            <TableCard>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <SearchBox value={search} onChange={setSearch} placeholder="Search by name or email…" />
+      </div>
+      <div className="mb-4">
+        <FilterPills label="Programme" options={programmeOptions} value={programme} onChange={setProgramme} />
+      </div>
+
+      <QueryView query={query} loading={<ListSkeleton rows={7} />}>
+        {() => (
+          <TableCard className={cn(query.isPlaceholderData && "opacity-60 transition-opacity")}>
+            {filtered.length === 0 ? (
+              <TableEmpty icon={GraduationCap}>
+                {teachers.length === 0 && !search ? "No teachers added yet." : "No teachers match your filters."}
+              </TableEmpty>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>Teacher</TableHead>
-                    <TableHead>Programme</TableHead>
-                    <TableHead>Pay</TableHead>
-                    <TableHead className="text-right">Classes</TableHead>
-                    <TableHead>Login</TableHead>
-                    <TableHead className="w-0" />
+                    <TableHead>Programme / Type</TableHead>
+                    <TableHead>Courses</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>CNIC</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teachers.map((teacher) => (
-                    <TableRow key={teacher.id}>
-                      <TableCell>
-                        <span className="flex flex-col">
-                          <span className="font-semibold">{teacher.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {teacher.email} · {teacher.phone}
-                          </span>
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm">{programmeOf(teacher.programme)?.label ?? teacher.programme}</TableCell>
-                      <TableCell className="text-sm">
-                        {teacher.type === "VISITING"
-                          ? `Visiting · ${formatRs(teacher.ratePerCreditHour)}/credit hr`
-                          : `Permanent · ${formatRs(teacher.salary)}`}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{teacher.sectionCourses.length}</TableCell>
-                      <TableCell>
-                        {teacher.user ? (
-                          <Badge variant={teacher.user.status === "ACTIVE" ? "success" : "secondary"}>
-                            {teacher.user.status === "ACTIVE" ? "Active" : teacher.user.status.toLowerCase()}
-                          </Badge>
-                        ) : (
-                          <Badge variant="warning">No login</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" aria-label={`Edit ${teacher.name}`} onClick={() => setEditing(teacher)}>
-                            <Pencil />
-                          </Button>
-                          <Button variant="ghost" size="icon" aria-label={`Delete ${teacher.name}`} onClick={() => setDeleting(teacher)}>
-                            <Trash2 />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filtered.map((t, i) => {
+                    const courses = [...new Map(t.sectionCourses.map((sc) => [sc.course.id, sc.course])).values()];
+                    return (
+                      <TableRow
+                        key={t.id}
+                        title="View details"
+                        className="cursor-pointer [&>td]:whitespace-normal"
+                        onClick={() => setViewing(t)}
+                      >
+                        <TableCell className={cn(muted, "w-10")}>{i + 1}</TableCell>
+                        <TableCell>
+                          <div className="font-semibold text-foreground">{t.name}</div>
+                          <div className={muted}>{t.qualification}</div>
+                          <LoginFlag teacher={t} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-[0.3rem]">
+                            <ProgrammeBadge category={categoryOf(t.programme)} short />
+                            <TypeBadge type={t.type} />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {courses.length === 0 ? (
+                            <span className={muted}>No course assigned</span>
+                          ) : (
+                            courses.map((c) => (
+                              <div key={c.id} className="whitespace-nowrap" title={c.name}>
+                                <strong>{c.code}</strong>
+                                <span className={muted}> · {c.name}</span>
+                              </div>
+                            ))
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[220px] truncate text-mid-foreground">{t.email}</div>
+                          <div className={muted}>{t.phone}</div>
+                        </TableCell>
+                        <TableCell className={cn(muted, "!whitespace-nowrap")}>{t.cnic}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-wrap justify-end gap-[0.4rem]">
+                            <RowButton kind="edit" icon={Pencil} label="Edit" title="Edit teacher" onClick={() => setModal(t)} />
+                            <RowButton kind="delete" icon={Trash2} label="Delete" title="Delete teacher" onClick={() => setDeleting(t)} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
-            </TableCard>
-          )
-        }
+            )}
+          </TableCard>
+        )}
       </QueryView>
 
-      <TeacherDialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
-        teacher={editing === "new" || editing === null ? undefined : editing}
-        categories={categories}
-        onLoginCreated={setLogin}
-      />
+      {viewing ? (
+        <TeacherDetails
+          teacher={viewing}
+          category={categoryOf(viewing.programme)}
+          onClose={() => setViewing(null)}
+          onEdit={() => {
+            setModal(viewing);
+            setViewing(null);
+          }}
+        />
+      ) : null}
+      {modal ? (
+        <ClassicTeacherModal teacher={modal === "new" ? undefined : modal} onClose={() => setModal(null)} onLoginCreated={setLogin} />
+      ) : null}
       <LoginCreatedDialog login={login} onClose={() => setLogin(null)} />
-      <ConfirmDialog
+      <ClassicConfirm
         open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title={`Delete ${deleting?.name}?`}
-        description="Their classes become unassigned and their login is archived (it can be restored from Users)."
-        confirmLabel="Delete"
-        destructive
-        pending={pending}
-        onConfirm={async () => {
-          if (!deleting) return;
-          setPending(true);
-          await runAction(universityAction("delete", `/teachers/${deleting.id}`));
-          setPending(false);
-          setDeleting(null);
-        }}
+        title="Delete Teacher"
+        message={`Are you sure you want to delete "${deleting?.name}"? This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
       />
     </PageContainer>
   );

@@ -7,7 +7,7 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { ArrowLeft, LayoutGrid, List, Menu as MenuIcon, Search, X } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List, Menu as MenuIcon, Pencil, Search, X } from "lucide-react";
 
 import { useGoBack } from "@/components/page/back-button";
 import Link from "@/components/ui/link";
@@ -165,6 +165,7 @@ export function ClassicModal({
 }: {
   open: boolean;
   onClose: () => void;
+  /** The header title; null when the children render their own Dialog title. */
   title?: ReactNode;
   width?: number;
   /** .modal-box-centered: a tall form centred in the viewport, scrolling inside its body. */
@@ -188,7 +189,7 @@ export function ClassicModal({
               centered && "flex max-h-[calc(100dvh-3rem-8vh)] flex-col",
             )}
           >
-            {title !== undefined ? (
+            {title === null ? null : title !== undefined ? (
               <div className="mb-6 flex items-center justify-between gap-3">
                 <DialogPrimitive.Title className="font-heading text-[1.05rem] font-extrabold text-foreground">{title}</DialogPrimitive.Title>
                 <DialogPrimitive.Close
@@ -592,5 +593,81 @@ export function ClassicPageHeader({ title, subtitle, action }: { title: ReactNod
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
+  );
+}
+
+/**
+ * The old DetailsModal: a read-only popup listing a record in labelled groups,
+ * with Close and (optionally) Edit. A field value may be any node (badge, list).
+ */
+export function DetailsModal({
+  title,
+  subtitle,
+  badge,
+  sections,
+  onEdit,
+  onClose,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  badge?: ReactNode;
+  sections: { heading: string; fields: [string, ReactNode][] }[];
+  onEdit?: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ClassicModal open onClose={onClose} width={600} title={null}>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <DialogPrimitive.Title className="font-heading text-[1.05rem] font-extrabold text-foreground">{title}</DialogPrimitive.Title>
+          {subtitle || badge ? (
+            <div className="mt-[0.3rem] flex flex-wrap items-center gap-2 text-[0.8rem] text-muted-foreground">
+              {badge}
+              {subtitle ? <span>{subtitle}</span> : null}
+            </div>
+          ) : null}
+        </div>
+        <DialogPrimitive.Close
+          aria-label="Close"
+          className="flex size-[30px] shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:border-destructive-border hover:bg-destructive-soft hover:text-destructive"
+        >
+          <X className="size-[15px]" />
+        </DialogPrimitive.Close>
+      </div>
+      <div className="grid gap-[1.1rem]">
+        {sections.map((s) => (
+          <section key={s.heading} className="rounded-[10px] border border-border px-4 py-[0.9rem]">
+            <h3 className="mb-3 text-[0.7rem] font-bold uppercase tracking-[0.05em] text-primary">{s.heading}</h3>
+            <dl className="m-0 grid grid-cols-2 gap-x-[1.2rem] gap-y-[0.8rem]">
+              {s.fields.map(([label, value]) => (
+                <DetailsField key={label} label={label} value={value} wide={s.fields.length === 1} />
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
+      <ModalActions>
+        <ClassicButton variant="outline" onClick={onClose}>
+          Close
+        </ClassicButton>
+        {onEdit ? (
+          <ClassicButton onClick={onEdit}>
+            <Pencil className="size-[14px]" /> Edit
+          </ClassicButton>
+        ) : null}
+      </ModalActions>
+    </ClassicModal>
+  );
+}
+
+/** .dept-badge-pill: a small rounded pill in an item's own colours. */
+export function ColorPill({ color, bg, children }: { color?: string; bg?: string; children: ReactNode }) {
+  return (
+    <span
+      className="inline-block max-w-full whitespace-nowrap rounded-xl px-2 py-[0.12rem] text-[0.68rem] font-bold"
+      style={{ color, background: bg }}
+    >
+      {children}
+    </span>
   );
 }
