@@ -59,7 +59,7 @@ const detailInclude = {
   sectionLinks: {
     include: {
       section: true,
-      teacher: { select: { id: true, name: true, email: true } },
+      teacher: { select: { id: true, name: true, email: true, phone: true } },
       classroom: { select: { id: true, code: true, status: true } },
     },
     orderBy: [{ section: { batch: "asc" } }, { section: { label: "asc" } }],
