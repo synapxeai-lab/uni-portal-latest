@@ -189,7 +189,7 @@ export function AssignmentFormDialog({
                   <button
                     type="button"
                     onClick={clearDueDate}
-                    className="text-xs font-medium text-link hover:underline"
+                    className="text-xs font-medium text-link"
                   >
                     No due date
                   </button>

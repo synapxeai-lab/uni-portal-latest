@@ -113,7 +113,7 @@ function Challans() {
                       <TableRow key={c.id}>
                         <TableCell>
                           <Link href={`/admin/students/${c.student.id}`} className="flex flex-col">
-                            <span className="font-semibold hover:underline">{c.student.name}</span>
+                            <span className="font-semibold">{c.student.name}</span>
                             <span className="font-mono text-xs text-muted-foreground">
                               {c.student.rollNo} · {c.student.batch}-{c.student.section}
                             </span>

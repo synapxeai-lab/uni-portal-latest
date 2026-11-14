@@ -100,7 +100,7 @@ export default function SectionPage() {
                       <TableRow key={link.id}>
                         <TableCell className="font-mono text-xs">{link.course.code}</TableCell>
                         <TableCell>
-                          <Link href={`/admin/courses/${link.courseId}`} className="font-semibold hover:underline">
+                          <Link href={`/admin/courses/${link.courseId}`} className="font-semibold">
                             {link.course.name}
                           </Link>
                         </TableCell>
@@ -108,7 +108,7 @@ export default function SectionPage() {
                         <TableCell>{link.teacher?.name ?? <span className="text-muted-foreground">Not assigned</span>}</TableCell>
                         <TableCell>
                           {link.classroom ? (
-                            <Link href={`/classes/${link.classroom.id}`} className="inline-flex items-center gap-1 text-link hover:underline">
+                            <Link href={`/classes/${link.classroom.id}`} className="inline-flex items-center gap-1 text-link">
                               Open <ExternalLink className="h-3 w-3" />
                             </Link>
                           ) : (
@@ -152,7 +152,7 @@ export default function SectionPage() {
                       <TableRow key={student.id}>
                         <TableCell className="font-mono text-xs">{student.rollNo}</TableCell>
                         <TableCell>
-                          <Link href={`/admin/students/${student.id}`} className="font-semibold hover:underline">
+                          <Link href={`/admin/students/${student.id}`} className="font-semibold">
                             {student.name}
                           </Link>
                         </TableCell>

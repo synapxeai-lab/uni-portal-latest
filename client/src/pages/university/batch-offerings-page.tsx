@@ -77,7 +77,7 @@ export default function BatchOfferingsPage() {
                       <TableRow key={course.id}>
                         <TableCell>
                           <span className="font-mono text-xs">{course.code}</span>{" "}
-                          <Link href={`/admin/courses/${course.id}`} className="font-semibold hover:underline">
+                          <Link href={`/admin/courses/${course.id}`} className="font-semibold">
                             {course.name}
                           </Link>
                         </TableCell>

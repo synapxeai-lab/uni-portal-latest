@@ -80,7 +80,7 @@ export default function ProgrammePage() {
                               {diploma.code.slice(0, 3)}
                             </ColourTile>
                             <span className="flex flex-col">
-                              <span className="font-semibold text-foreground hover:underline">{diploma.name}</span>
+                              <span className="font-semibold text-foreground">{diploma.name}</span>
                               <span className="text-xs text-muted-foreground">
                                 {diploma.code} · Head: {diploma.head}
                               </span>

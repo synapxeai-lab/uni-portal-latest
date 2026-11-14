@@ -133,7 +133,7 @@ export default function DiplomaPage() {
                           <TableRow key={course.id}>
                             <TableCell className="font-mono text-xs">{course.code}</TableCell>
                             <TableCell>
-                              <Link href={`/admin/courses/${course.id}`} className="font-semibold hover:underline">
+                              <Link href={`/admin/courses/${course.id}`} className="font-semibold">
                                 {course.name}
                               </Link>
                             </TableCell>
@@ -204,7 +204,7 @@ export default function DiplomaPage() {
                         {sections.map((section) => (
                           <Card key={section.id} className="flex items-center justify-between gap-3 p-4">
                             <Link href={`/admin/sections/${section.id}`} className="flex flex-col">
-                              <span className="font-semibold hover:underline">Section {section.label}</span>
+                              <span className="font-semibold">Section {section.label}</span>
                               <span className="text-xs text-muted-foreground">
                                 {section._count.students} students · {section.courseLinks.length} courses offered
                               </span>

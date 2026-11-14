@@ -101,12 +101,12 @@ export default function CoursesPage() {
                     <TableRow key={course.id}>
                       <TableCell className="font-mono text-xs">{course.code}</TableCell>
                       <TableCell>
-                        <Link href={`/admin/courses/${course.id}`} className="font-semibold hover:underline">
+                        <Link href={`/admin/courses/${course.id}`} className="font-semibold">
                           {course.name}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/admin/diplomas/${course.departmentId}`} className="text-sm hover:underline">
+                        <Link href={`/admin/diplomas/${course.departmentId}`} className="text-sm">
                           {course.department?.code}
                         </Link>
                         <span className="ml-1 text-xs text-muted-foreground">

@@ -300,7 +300,7 @@ function StudentsView({ sheet, path }: { sheet: Sheet; path: string }) {
             return (
               <TableRow key={s.enrollmentId} className="cursor-pointer" onClick={() => router.push(href)}>
                 <TableCell>
-                  <Link href={href} className="flex flex-col hover:underline" onClick={(e) => e.stopPropagation()}>
+                  <Link href={href} className="flex flex-col" onClick={(e) => e.stopPropagation()}>
                     <span className="font-semibold">{s.student.name}</span>
                     <span className="font-mono text-xs text-muted-foreground">{s.student.rollNo}</span>
                   </Link>
@@ -379,7 +379,7 @@ function AssessmentsView({ sheet }: { sheet: Sheet }) {
                 <TableHead>Student</TableHead>
                 {assessments.map((a) => (
                   <TableHead key={a.id} className="text-right">
-                    <button onClick={() => setEditing(a)} className="hover:underline">
+                    <button onClick={() => setEditing(a)}>
                       {a.title}
                     </button>
                   </TableHead>

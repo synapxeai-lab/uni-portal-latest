@@ -153,14 +153,14 @@ export default function CoursePage() {
                       <TableRow key={link.id}>
                         <TableCell>{link.section.batch}</TableCell>
                         <TableCell>
-                          <Link href={`/admin/sections/${link.section.id}`} className="hover:underline">
+                          <Link href={`/admin/sections/${link.section.id}`} >
                             Section {link.section.label}
                           </Link>
                         </TableCell>
                         <TableCell>{link.teacher?.name ?? <span className="text-muted-foreground">Not assigned</span>}</TableCell>
                         <TableCell>
                           {link.classroom ? (
-                            <Link href={`/classes/${link.classroom.id}`} className="inline-flex items-center gap-1 text-link hover:underline">
+                            <Link href={`/classes/${link.classroom.id}`} className="inline-flex items-center gap-1 text-link">
                               Open <ExternalLink className="h-3 w-3" />
                             </Link>
                           ) : (

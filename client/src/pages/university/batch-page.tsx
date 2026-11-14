@@ -43,7 +43,7 @@ export default function BatchPage() {
                             <ColourTile color={diploma.color} bg={diploma.bg} className="h-8 w-8 text-xs font-bold">
                               {ordinal(diploma.semester)}
                             </ColourTile>
-                            <Link href={`/admin/diplomas/${diploma.id}`} className="font-semibold hover:underline">
+                            <Link href={`/admin/diplomas/${diploma.id}`} className="font-semibold">
                               {diploma.name}
                             </Link>
                           </div>
