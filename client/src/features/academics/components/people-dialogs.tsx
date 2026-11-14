@@ -63,7 +63,7 @@ export interface StudentRecord {
   guardianEmail: string | null;
   userId: string | null;
   user: { id: string; status: string } | null;
-  currentDiploma: { id: number; name: string; code: string; semester: number } | null;
+  currentDiploma: { id: number; name: string; code: string; semester: number; color: string; bg: string } | null;
 }
 
 export interface CreatedLogin {
