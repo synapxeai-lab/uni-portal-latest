@@ -9,7 +9,6 @@ import {
   ClassicConfirm,
   ClassicPageHeader,
   ColorPill,
-  DetailsModal,
   FilterPills,
   RowButton,
   SearchBox,
@@ -19,9 +18,10 @@ import {
 } from "@/components/classic/classic";
 import { QueryView } from "@/app/route-states";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useRouter } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { queryString, universityAction, useProgrammeCategories, useUniversityQuery } from "@/features/academics/api";
-import { ClassicTeacherModal, payRateText, teacherTypeByKey } from "@/features/academics/components/classic-teacher-modal";
+import { ClassicTeacherModal, teacherTypeByKey } from "@/features/academics/components/classic-teacher-modal";
 import { LoginCreatedDialog, type CreatedLogin, type TeacherRecord } from "@/features/academics/components/people-dialogs";
 import { runAction, TableCard } from "@/features/academics/components/ui";
 import type { ProgrammeCategory } from "@/features/academics/types";
@@ -29,7 +29,7 @@ import type { ProgrammeCategory } from "@/features/academics/types";
 /**
  * Teachers (admin): an exact replica of the old University Portal's Teachers
  * page - search, programme pills with counts, and a table whose rows open the
- * teacher's details.
+ * teacher's page.
  */
 
 const shortProgrammeLabel = (label: string) => label.replace(/ Programmes?$/i, "");
@@ -63,87 +63,8 @@ function LoginFlag({ teacher }: { teacher: TeacherRecord }) {
   );
 }
 
-function TeacherDetails({
-  teacher: t,
-  category,
-  onEdit,
-  onClose,
-}: {
-  teacher: TeacherRecord;
-  category?: ProgrammeCategory;
-  onEdit: () => void;
-  onClose: () => void;
-}) {
-  const assignments = t.sectionCourses;
-  return (
-    <DetailsModal
-      title={t.name}
-      subtitle={t.qualification}
-      badge={<ProgrammeBadge category={category} />}
-      sections={[
-        {
-          heading: "Personal Information",
-          fields: [
-            ["Full Name", t.name],
-            ["CNIC", t.cnic],
-            ["Qualification", t.qualification],
-            ["Programme", category?.label],
-          ],
-        },
-        {
-          heading: "Employment",
-          fields: [
-            ["Teacher Type", teacherTypeByKey(t.type).label],
-            [t.type === "VISITING" ? "Rate" : "Salary", payRateText(t) ?? "Not set"],
-          ],
-        },
-        {
-          heading: "Contact",
-          fields: [
-            ["Email", t.email],
-            ["Phone", t.phone],
-            ["Address", t.address],
-          ],
-        },
-        {
-          heading: "Guardian",
-          fields: [
-            ["Guardian Name", t.guardianName],
-            ["Guardian Contact", t.guardianContact],
-            ["Guardian CNIC", t.guardianCnic],
-          ],
-        },
-        {
-          heading: `Teaching Assignments (${assignments.length})`,
-          fields: [
-            [
-              "Courses & Sections",
-              assignments.length === 0 ? (
-                "No course assigned"
-              ) : (
-                <ul className="m-0 grid list-disc gap-[0.3rem] pl-[1.1rem]">
-                  {assignments.map((sc) => (
-                    <li key={sc.id}>
-                      <strong>{sc.course.code}</strong> — {sc.course.name}
-                      <span className={muted}>
-                        {" "}
-                        · Section {sc.section.label}, Batch {sc.section.batch}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ),
-            ],
-          ],
-        },
-      ]}
-      onEdit={onEdit}
-      onClose={onClose}
-    />
-  );
-}
-
 export default function TeachersPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [programme, setProgramme] = useState("");
   const debounced = useDebouncedValue(search.trim(), 300);
@@ -156,7 +77,6 @@ export default function TeachersPage() {
   const filtered = programme ? teachers.filter((t) => t.programme === programme) : teachers;
 
   const [modal, setModal] = useState<TeacherRecord | "new" | null>(null);
-  const [viewing, setViewing] = useState<TeacherRecord | null>(null);
   const [deleting, setDeleting] = useState<TeacherRecord | null>(null);
   const [login, setLogin] = useState<CreatedLogin | null>(null);
 
@@ -222,7 +142,7 @@ export default function TeachersPage() {
                         key={t.id}
                         title="View details"
                         className="cursor-pointer [&>td]:whitespace-normal"
-                        onClick={() => setViewing(t)}
+                        onClick={() => router.push(`/admin/teachers/${t.id}`)}
                       >
                         <TableCell className={cn(muted, "w-10")}>{i + 1}</TableCell>
                         <TableCell>
@@ -269,17 +189,6 @@ export default function TeachersPage() {
         )}
       </QueryView>
 
-      {viewing ? (
-        <TeacherDetails
-          teacher={viewing}
-          category={categoryOf(viewing.programme)}
-          onClose={() => setViewing(null)}
-          onEdit={() => {
-            setModal(viewing);
-            setViewing(null);
-          }}
-        />
-      ) : null}
       {modal ? (
         <ClassicTeacherModal teacher={modal === "new" ? undefined : modal} onClose={() => setModal(null)} onLoginCreated={setLogin} />
       ) : null}

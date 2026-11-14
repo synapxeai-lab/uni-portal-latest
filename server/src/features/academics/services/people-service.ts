@@ -42,7 +42,9 @@ const teacherInclude = {
   sectionCourses: {
     include: {
       course: { select: { id: true, code: true, name: true, creditHours: true } },
-      section: { select: { id: true, label: true, batch: true } },
+      section: {
+        select: { id: true, label: true, batch: true, department: { select: { id: true, code: true, name: true, color: true, bg: true } } },
+      },
     },
   },
   user: { select: { id: true, status: true } },
