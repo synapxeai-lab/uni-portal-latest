@@ -401,7 +401,7 @@ export async function batchOfferings(departmentId: number, batch: string) {
     }),
     prisma.course.findMany({
       where: { department: { category: department.category } },
-      include: { department: { select: { id: true, code: true, name: true, semester: true } } },
+      include: { department: { select: { id: true, code: true, name: true, semester: true } }, _count: { select: { sectionLinks: true } } },
       orderBy: [{ department: { semester: "asc" } }, { code: "asc" }],
     }),
   ]);
@@ -425,6 +425,8 @@ export async function batchOfferings(departmentId: number, batch: string) {
         code: course.code,
         name: course.name,
         creditHours: course.creditHours,
+        // Active while offered to any section anywhere (as on the Courses page).
+        status: course._count.sectionLinks > 0 ? ("ACTIVE" as const) : ("INACTIVE" as const),
         department: course.department,
         ownDiploma: course.departmentId === departmentId,
         offeredTo: links,
