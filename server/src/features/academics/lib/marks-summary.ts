@@ -6,6 +6,8 @@ export interface MarkItem {
   categoryId?: number;
   obtained: number | null;
   total: number;
+  /** The item's own share of the course percentage, inside its category's weightage. */
+  weightage?: number | null;
 }
 
 /**
@@ -25,25 +27,39 @@ export function weightsFor(categories: { id: number; weightage: number | null }[
 }
 
 /**
- * Weighted percentage: each category's graded marks give its own percentage,
- * and the course percentage is their weighted average. Categories with nothing
- * graded yet are left out (remaining weights rescaled).
+ * Weighted percentage. An item with its own weightage counts by it; a
+ * category's other items share what its weightage has left over, pooled by
+ * marks (with no item weightages that is the whole category, as before). The
+ * course percentage is the weighted average of everything graded, so ungraded
+ * work and unallocated weight are left out (remaining weights rescaled).
  */
-function weightedPercentage(graded: MarkItem[], weights: Map<number, number>): number | null {
-  const byCategory = new Map<number, { obtained: number; total: number }>();
-  for (const mark of graded) {
-    const entry = byCategory.get(mark.categoryId!) ?? { obtained: 0, total: 0 };
-    entry.obtained += mark.obtained!;
-    entry.total += mark.total;
-    byCategory.set(mark.categoryId!, entry);
+function weightedPercentage(items: MarkItem[], weights: Map<number, number>): number | null {
+  const allocated = new Map<number, number>();
+  for (const item of items) {
+    if (item.weightage != null) allocated.set(item.categoryId!, (allocated.get(item.categoryId!) ?? 0) + item.weightage);
+  }
+  const parts: { weight: number; obtained: number; total: number }[] = [];
+  const pooled = new Map<number, { obtained: number; total: number }>();
+  for (const item of items) {
+    if (item.obtained === null) continue;
+    if (item.weightage != null) {
+      parts.push({ weight: item.weightage, obtained: item.obtained, total: item.total });
+      continue;
+    }
+    const entry = pooled.get(item.categoryId!) ?? { obtained: 0, total: 0 };
+    entry.obtained += item.obtained;
+    entry.total += item.total;
+    pooled.set(item.categoryId!, entry);
+  }
+  for (const [categoryId, entry] of pooled) {
+    parts.push({ weight: (weights.get(categoryId) ?? 0) - (allocated.get(categoryId) ?? 0), ...entry });
   }
   let weighted = 0;
   let weightUsed = 0;
-  for (const [categoryId, entry] of byCategory) {
-    const weight = weights.get(categoryId);
-    if (!weight || !entry.total) continue;
-    weighted += weight * (entry.obtained / entry.total);
-    weightUsed += weight;
+  for (const part of parts) {
+    if (part.weight <= 0 || !part.total) continue;
+    weighted += part.weight * (part.obtained / part.total);
+    weightUsed += part.weight;
   }
   return weightUsed ? Math.round((weighted / weightUsed) * 100) : null;
 }
@@ -65,7 +81,7 @@ export function summarizeMarks(
   const graded = items.filter((m) => m.obtained !== null);
   const obtained = graded.reduce((sum, m) => sum + m.obtained!, 0);
   const total = graded.reduce((sum, m) => sum + m.total, 0);
-  const computedPercentage = weights ? weightedPercentage(graded, weights) : total ? Math.round((obtained / total) * 100) : null;
+  const computedPercentage = weights ? weightedPercentage(items, weights) : total ? Math.round((obtained / total) * 100) : null;
   const adjusted = percentageOverride !== null && percentageOverride !== undefined;
   const percentage = adjusted ? percentageOverride : computedPercentage;
   const computedGrade = gradeFor(percentage, grades);
@@ -110,7 +126,12 @@ export async function summarizeEnrollments(
       const obtainedBy = new Map(e.marks.map((m) => [m.assessmentId, m.obtained]));
       const own = categories.filter((c) => c.courseId === e.courseId && c.sectionId === e.sectionId);
       const items = own.flatMap((c) =>
-        c.assessments.map((a) => ({ categoryId: c.id, obtained: obtainedBy.get(a.id) ?? null, total: a.totalMarks })),
+        c.assessments.map((a) => ({
+          categoryId: c.id,
+          obtained: obtainedBy.get(a.id) ?? null,
+          total: a.totalMarks,
+          weightage: a.weightage,
+        })),
       );
       return [
         e.id,

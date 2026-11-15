@@ -1,3 +1,4 @@
+import { AssignmentStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 
 import { getBatchYears } from "../lib/batches";
@@ -32,26 +33,31 @@ async function toCourseMarks(enrollments: MarksEnrollment[]) {
       ? []
       : await prisma.assessmentCategory.findMany({
           where: { OR: enrollments.map((e) => ({ courseId: e.courseId, sectionId: e.sectionId })) },
-          include: { assessments: { orderBy: { createdAt: "asc" } } },
+          include: { assessments: { orderBy: { createdAt: "asc" }, include: { assignment: { select: { status: true } } } } },
         });
   return enrollments.map((e) => {
     const obtainedBy = new Map(e.marks.map((m) => [m.assessmentId, m.obtained]));
     const own = categories
       .filter((c) => c.courseId === e.courseId && c.sectionId === e.sectionId)
       .sort((a, b) => compareTypes(a.type, b.type) || a.id - b.id);
-    const marks = own.flatMap((c) =>
+    const all = own.flatMap((c) =>
       c.assessments.map((a) => ({
         id: a.id,
         categoryId: c.id,
         type: c.type,
         weightage: c.weightage,
+        itemWeightage: a.weightage,
         title: a.title,
         obtained: obtainedBy.get(a.id) ?? null,
         total: a.totalMarks,
+        // Classwork the students haven't been given yet (draft or scheduled) stays off their marksheet.
+        visible: !a.assignment || a.assignment.status === AssignmentStatus.PUBLISHED || a.assignment.status === AssignmentStatus.CLOSED,
       })),
     );
+    const marks = all.filter((m) => m.visible).map(({ visible: _visible, ...m }) => m);
+    // Every item counts towards the weighting (a hidden one has no marks yet, but holds its share).
     const { grade: _live, computedGrade: _computed, gradeAdjusted: _adjusted, ...summary } = summarizeMarks(
-      marks,
+      all.map((m) => ({ categoryId: m.categoryId, obtained: m.obtained, total: m.total, weightage: m.itemWeightage })),
       e.percentageOverride,
       undefined,
       null,

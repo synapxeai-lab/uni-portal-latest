@@ -45,4 +45,6 @@ export interface AssignmentSummary {
   attachments: AttachedFileSummary[];
   /** Whether the current viewer may edit/publish/close/delete this assignment. */
   canManage: boolean;
+  /** Its item on the course section's marksheet (teachers only), if it's on one. */
+  marks: { category: string; title: string; weightage: number | null } | null;
 }

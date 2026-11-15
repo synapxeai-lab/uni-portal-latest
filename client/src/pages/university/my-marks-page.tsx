@@ -20,7 +20,15 @@ interface CourseMarks {
   section: { label: string };
   summary: { percentage: number | null; grade: string | null };
   categories: { id: number; type: string; weightage: number | null }[];
-  marks: { id: number; categoryId: number; title: string; obtained: number | null; total: number }[];
+  marks: {
+    id: number;
+    categoryId: number;
+    title: string;
+    obtained: number | null;
+    total: number;
+    /** The item's own share of the course, when the teacher gave it one. */
+    itemWeightage: number | null;
+  }[];
 }
 interface MyMarks {
   groups: { semester: string; year: number; courses: CourseMarks[] }[];
@@ -91,7 +99,12 @@ function CategoryBlock({ label, weightage, items }: { label: string; weightage: 
       ) : (
         items.map((m) => (
           <TableRow key={m.id}>
-            <TableCell className="pl-6">{m.title}</TableCell>
+            <TableCell className="pl-6">
+              {m.title}
+              {m.itemWeightage !== null ? (
+                <span className="text-xs text-muted-foreground"> · {Math.round(m.itemWeightage * 100) / 100}% of the course</span>
+              ) : null}
+            </TableCell>
             <TableCell className="text-right tabular-nums">
               {m.obtained === null ? <span className="text-muted-foreground">Not marked</span> : `${m.obtained} / ${m.total}`}
             </TableCell>

@@ -1094,6 +1094,9 @@ model Assessment {
   category   AssessmentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   title      String
   totalMarks Float
+  // Share of the course percentage this item carries, out of its category's weightage (the
+  // items of a category can't total more). Null: shares what the category has left, by marks.
+  weightage  Float?
   // Optional link to a classroom assignment: its returned grades are copied in, scaled to totalMarks.
   assignmentId String?          @unique @db.Uuid
   assignment   Assignment?      @relation(fields: [assignmentId], references: [id], onDelete: SetNull)

@@ -39,8 +39,10 @@ interface Assessment {
   id: number;
   title: string;
   totalMarks: number;
+  /** Its own share of the course percentage; null shares what the category has left. */
+  weightage: number | null;
   /** The classroom assignment whose returned grades fill this item, if linked. */
-  assignment: { id: string; title: string } | null;
+  assignment: { id: string; title: string; status: "DRAFT" | "SCHEDULED" | "PUBLISHED" | "CLOSED" } | null;
 }
 interface Category {
   id: number;
@@ -49,6 +51,8 @@ interface Category {
   component: "THEORY" | "PRACTICAL" | null;
   fromScheme: boolean;
   singleAssessment: boolean;
+  /** Item weightage already given out. */
+  allocated: number;
   assessments: Assessment[];
 }
 interface Summary {
@@ -91,19 +95,63 @@ const schemeNote = (sheet: Sheet) =>
       ? `The scheme covers ${sheet.totalWeightage}% so far; percentages use raw totals until it reaches 100%.`
       : "No assessment scheme yet - an administrator sets it on the course page.";
 
+const pct = (n: number) => `${Math.round(n * 100) / 100}%`;
+
 const categoryMeta = (c: Category) =>
-  `${c.weightage ?? 0}%${c.component ? ` · ${c.component === "THEORY" ? "theory" : "practical"}` : ""}`;
+  `${pct(c.weightage ?? 0)}${c.component ? ` · ${c.component === "THEORY" ? "theory" : "practical"}` : ""}` +
+  (c.allocated > 0 ? ` · ${pct(c.allocated)} given to items` : "");
+
+/** What's left of a category's weightage for one item (its own share counted back in when editing it). */
+const weightageLeft = (c: Category, own: Assessment | null = null) =>
+  c.weightage ? Math.max(0, c.weightage - c.allocated + (own?.weightage ?? 0)) : null;
+
+const weightageHint = (c: Category, left: number | null) =>
+  left === null
+    ? `${categoryLabel(c.type)} has no weightage in the scheme, so its items can't carry one.`
+    : `Up to ${pct(left)} of ${categoryLabel(c.type)}'s ${pct(c.weightage!)}. Leave empty to share what's left by marks.`;
+
+/** Classwork students haven't been given yet: it's on the marksheet but they don't see it. */
+const isUnreleased = (a: Assessment) => a.assignment?.status === "DRAFT" || a.assignment?.status === "SCHEDULED";
+
+function ItemTags({ assessment }: { assessment: Assessment }) {
+  return (
+    <>
+      {assessment.weightage !== null ? (
+        <span className="ml-1 font-normal text-muted-foreground">· {pct(assessment.weightage)}</span>
+      ) : null}
+      {assessment.assignment ? <Link2 className="ml-1 inline size-3 text-muted-foreground" aria-label="From classwork" /> : null}
+      {isUnreleased(assessment) ? (
+        <Badge variant="secondary" className="ml-1.5">
+          Draft
+        </Badge>
+      ) : null}
+    </>
+  );
+}
 
 /** Adds the next item to a category ("Quiz 3"), optionally filled from classwork. */
 function AddItemDialog({ category, sheet, onClose }: { category: Category | null; sheet: Sheet; onClose: () => void }) {
+  const left = category ? weightageLeft(category) : null;
   return (
     <FormDialog
       open={category !== null}
       onOpenChange={(open) => !open && onClose()}
       title={category ? `Add to ${categoryLabel(category.type)}` : ""}
-      description="Items are numbered automatically (Quiz 3...); mid, practical and final are single exams."
+      description="For physical work, marked here. Digital work marked in the classroom is added from Classwork. Items are numbered automatically (Quiz 3...); mid, practical and final are single exams."
       fields={[
         { name: "totalMarks", label: "Out of (total marks)", type: "number", required: true, min: 1, max: 1000 },
+        {
+          name: "weightage",
+          label: "Weightage (%)",
+          type: "number",
+          nullable: true,
+          min: 0,
+          max: left ?? undefined,
+          step: 0.01,
+          placeholder: "Share what's left",
+          hint: category ? weightageHint(category, left) : undefined,
+          hidden: () => left === null,
+        },
         {
           name: "assignmentId",
           label: "Fill from classwork",
@@ -113,11 +161,12 @@ function AddItemDialog({ category, sheet, onClose }: { category: Category | null
           options: sheet.classwork.filter((a) => !a.linked).map((a) => ({ value: a.id, label: `${a.title} (${a.points} pts)` })),
         },
       ]}
-      initialValues={{ totalMarks: 10, assignmentId: "" }}
+      initialValues={{ totalMarks: 10, weightage: null, assignmentId: "" }}
       submitLabel="Add"
       onSubmit={(values) =>
         universityAction("post", `/marks/categories/${category!.id}/assessments`, {
           totalMarks: values.totalMarks,
+          weightage: values.weightage ?? null,
           assignmentId: values.assignmentId || null,
         })
       }
@@ -166,10 +215,13 @@ function GradingDialog({ path, grading, onClose }: { path: string; grading: Shee
   );
 }
 
-/** By assessment: every student's marks for one item at once; change its total or delete it. */
+/** By assessment: every student's marks for one item at once; change its total or weightage, or delete it. */
 function AssessmentDialog({ assessment, sheet, onClose }: { assessment: Assessment; sheet: Sheet; onClose: () => void }) {
+  const category = sheet.categories.find((c) => c.assessments.some((a) => a.id === assessment.id))!;
+  const left = weightageLeft(category, assessment);
   const [values, setValues] = useState<Record<number, string>>({});
   const [total, setTotal] = useState(String(assessment.totalMarks));
+  const [weightage, setWeightage] = useState(assessment.weightage === null ? "" : String(assessment.weightage));
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -183,8 +235,11 @@ function AssessmentDialog({ assessment, sheet, onClose }: { assessment: Assessme
 
   async function save() {
     setSaving(true);
-    if (Number(total) !== assessment.totalMarks) {
-      const ok = await runAction(universityAction("put", `/marks/assessments/${assessment.id}`, { totalMarks: Number(total) }));
+    const newWeightage = weightage.trim() === "" ? null : Number(weightage);
+    if (Number(total) !== assessment.totalMarks || newWeightage !== assessment.weightage) {
+      const ok = await runAction(
+        universityAction("put", `/marks/assessments/${assessment.id}`, { totalMarks: Number(total), weightage: newWeightage }),
+      );
       if (!ok) {
         setSaving(false);
         return;
@@ -210,14 +265,34 @@ function AssessmentDialog({ assessment, sheet, onClose }: { assessment: Assessme
             <DialogTitle>{assessment.title}</DialogTitle>
             <DialogDescription>
               {assessment.assignment
-                ? `Filled from "${assessment.assignment.title}": each grade is copied here when the work is returned, scaled to this total.`
+                ? `Filled from the classroom assignment "${assessment.assignment.title}": each grade is copied here when it's marked, scaled to this total.` +
+                  (isUnreleased(assessment) ? " Students don't see it until the assignment is published." : "")
                 : "Leave a box empty for a student who hasn't been marked yet."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="total-marks">Out of</Label>
-            <Input id="total-marks" type="number" min={1} className="w-28" value={total} onChange={(e) => setTotal(e.target.value)} />
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="total-marks">Out of</Label>
+              <Input id="total-marks" type="number" min={1} className="w-28" value={total} onChange={(e) => setTotal(e.target.value)} />
+            </div>
+            {left !== null ? (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="item-weightage">Weightage (%)</Label>
+                <Input
+                  id="item-weightage"
+                  type="number"
+                  min={0}
+                  max={left}
+                  step="any"
+                  placeholder="Shared"
+                  className="w-28"
+                  value={weightage}
+                  onChange={(e) => setWeightage(e.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
+          <p className="-mt-2 text-xs text-muted-foreground">{weightageHint(category, left)}</p>
           <div className="flex flex-col divide-y divide-border">
             {sheet.students.map((s) => (
               <label key={s.enrollmentId} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -239,9 +314,14 @@ function AssessmentDialog({ assessment, sheet, onClose }: { assessment: Assessme
             ))}
           </div>
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="outline" onClick={() => setDeleting(true)}>
-              <Trash2 /> Delete
-            </Button>
+            {assessment.assignment ? (
+              // Classwork items leave the marksheet from the classroom, so the two never disagree.
+              <p className="self-center text-xs text-muted-foreground">To remove it, edit or delete the assignment in Classwork.</p>
+            ) : (
+              <Button variant="outline" onClick={() => setDeleting(true)}>
+                <Trash2 /> Delete
+              </Button>
+            )}
             <Button onClick={save} disabled={saving}>
               {saving ? "Saving…" : "Save marks"}
             </Button>
@@ -361,7 +441,7 @@ function AssessmentsView({ sheet }: { sheet: Sheet }) {
                     title={a.assignment ? `From classwork: ${a.assignment.title}` : undefined}
                   >
                     {a.title} <span className="font-normal text-muted-foreground">/{a.totalMarks}</span>
-                    {a.assignment ? <Link2 className="ml-1 inline size-3 text-muted-foreground" aria-label="Linked to classwork" /> : null}
+                    <ItemTags assessment={a} />
                   </button>
                 ))}
               </div>
@@ -577,9 +657,12 @@ function CategoryRows({
           <TableRow key={a.id}>
             <TableCell className="pl-6">
               {a.title}
+              <span className="text-xs">
+                <ItemTags assessment={a} />
+              </span>
               {a.assignment ? (
-                <span className="ml-1.5 text-xs text-muted-foreground" title={`Filled when "${a.assignment.title}" is returned`}>
-                  <Link2 className="inline size-3" aria-label="Linked to classwork" /> {a.assignment.title}
+                <span className="ml-1.5 text-xs text-muted-foreground" title={`Filled when "${a.assignment.title}" is marked`}>
+                  {a.assignment.title}
                 </span>
               ) : null}
             </TableCell>

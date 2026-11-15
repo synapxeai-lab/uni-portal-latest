@@ -2,7 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiAction, apiGet } from "@/lib/api";
 
-import type { ActionResult, AssignmentSummary, MaterialSummary, TopicSummary } from "./types";
+import type {
+  ActionResult,
+  AssignmentSummary,
+  MarksCategoryOption,
+  MaterialSummary,
+  TopicSummary,
+} from "./types";
 
 // ---- Queries ------------------------------------------------------------------
 
@@ -35,6 +41,21 @@ export function useAssignmentDetail(classroomId: string, assignmentId: string) {
     queryKey: classworkKeys.assignment(classroomId, assignmentId),
     queryFn: () =>
       apiGet<AssignmentDetailData>(`/classrooms/${classroomId}/assignments/${assignmentId}`),
+  });
+}
+
+/**
+ * The marksheet categories the assignment dialog offers - fetched only while
+ * it's open, and fresh each time so the weightage left is current. null: this
+ * classroom isn't a course section's, so its work doesn't go on a marksheet.
+ */
+export function useMarksCategories(classroomId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["classwork", classroomId, "marks-categories"],
+    queryFn: () =>
+      apiGet<{ categories: MarksCategoryOption[] | null }>(`/classrooms/${classroomId}/marks-categories`),
+    enabled,
+    staleTime: 0,
   });
 }
 

@@ -24,14 +24,121 @@ import {
 import { useTimeZone } from "@/components/providers/time-zone-provider";
 import { fromDateTimeInputValue, toDateTimeInputParts } from "@/lib/datetime/format";
 
+import { categoryLabel } from "@/features/academics/lib/marks";
+
 import {
   createAssignmentAction,
   removeAssignmentAttachmentAction,
   updateAssignmentAction,
+  useMarksCategories,
 } from "../api";
-import type { ActionResult, AssignmentSummary, TopicSummary } from "../types";
+import type { ActionResult, AssignmentSummary, MarksCategoryOption, TopicSummary } from "../types";
 
 const initialState: ActionResult<AssignmentSummary> | null = null;
+
+interface MarksheetState {
+  /** null while loading, or when this classroom isn't a course section's (no marksheet). */
+  categories: MarksCategoryOption[] | null;
+  current: AssignmentSummary["marks"];
+}
+
+const pct = (n: number) => `${Math.round(n * 100) / 100}%`;
+
+/**
+ * Which marksheet category graded work counts in - digital assessments are
+ * marked here and their marks reach the students' marksheet. Not rendered
+ * until the categories load, so an edit saved before then keeps the current one.
+ */
+function MarksCategoryField({
+  state,
+  category,
+  onCategoryChange,
+  fieldError,
+}: {
+  state: MarksheetState;
+  category: string;
+  onCategoryChange: (value: string) => void;
+  fieldError?: string;
+}) {
+  if (!state.categories || state.categories.length === 0) {
+    return null;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="assignment-marksCategory">Marksheet</Label>
+      <Select
+        id="assignment-marksCategory"
+        name="marksCategory"
+        value={category}
+        onChange={(event) => onCategoryChange(event.target.value)}
+      >
+        <option value="">Not on marksheet</option>
+        {state.categories.map((c) => {
+          // A single exam (Mid Term) can only be on the marksheet once.
+          const taken = c.singleAssessment && c.items > 0 && state.current?.category !== c.type;
+          return (
+            <option key={c.type} value={c.type} disabled={taken}>
+              {categoryLabel(c.type)}
+              {c.weightage ? ` · ${pct(c.weightage)}` : ""}
+              {taken ? " (added)" : ""}
+            </option>
+          );
+        })}
+      </Select>
+      {fieldError ? <p className="text-xs text-destructive">{fieldError}</p> : null}
+    </div>
+  );
+}
+
+/** The item's own weightage, within what its category has left. */
+function MarksWeightageField({
+  state,
+  category,
+  current,
+  fieldError,
+}: {
+  state: MarksheetState;
+  category: string;
+  current: AssignmentSummary["marks"];
+  fieldError?: string;
+}) {
+  const selected = state.categories?.find((c) => c.type === category);
+  if (!selected) {
+    return null;
+  }
+  const sameCategory = current?.category === category;
+  // The assignment's own share is free to re-use when it stays in the same category.
+  const left = selected.weightage
+    ? Math.max(0, selected.weightage - selected.allocated + (sameCategory ? (current?.weightage ?? 0) : 0))
+    : null;
+  const label = categoryLabel(selected.type);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="assignment-marksWeightage">Weightage (%)</Label>
+      <Input
+        // A different category starts empty: the old share doesn't carry over.
+        key={category}
+        id="assignment-marksWeightage"
+        name="marksWeightage"
+        type="number"
+        min={0}
+        max={left ?? undefined}
+        step="any"
+        placeholder={left === null ? "Not weighted" : "Share what's left"}
+        defaultValue={sameCategory ? (current?.weightage ?? "") : ""}
+        disabled={left === null}
+        className="w-40"
+      />
+      <p className="text-xs text-muted-foreground">
+        {left === null
+          ? `${label} has no weightage in the course's assessment scheme.`
+          : `${label} carries ${pct(selected.weightage!)}; up to ${pct(left)} is left for this one. ` +
+            "Leave empty to share what's left of the category by marks."}
+      </p>
+      {fieldError ? <p className="text-xs text-destructive">{fieldError}</p> : null}
+    </div>
+  );
+}
 
 interface AssignmentFormDialogProps {
   mode: "create" | "edit";
@@ -63,6 +170,19 @@ export function AssignmentFormDialog({
   const [initialDue] = useState(() => toDateTimeInputParts(assignment?.dueDate, timeZone));
   const [dueDay, setDueDay] = useState(initialDue.date);
   const [dueTime, setDueTime] = useState(initialDue.time);
+  const marksCategories = useMarksCategories(classroomId, open);
+  const marksheet: MarksheetState = {
+    categories: marksCategories.data?.categories ?? null,
+    current: assignment?.marks ?? null,
+  };
+  const [marksCategory, setMarksCategory] = useState(assignment?.marks?.category ?? "");
+
+  // Reopening starts from where the assignment is now (it may have changed since).
+  useEffect(() => {
+    if (open) {
+      setMarksCategory(assignment?.marks?.category ?? "");
+    }
+  }, [open, assignment?.marks?.category]);
 
   // Separate date and time fields: a single datetime-local input reports no
   // value at all until both halves are filled, which made it impossible to
@@ -231,7 +351,19 @@ export function AssignmentFormDialog({
                   <p className="text-xs text-destructive">{fieldErrors.points[0]}</p>
                 ) : null}
               </div>
+              <MarksCategoryField
+                state={marksheet}
+                category={marksCategory}
+                onCategoryChange={setMarksCategory}
+                fieldError={fieldErrors?.marksCategory?.[0]}
+              />
             </div>
+            <MarksWeightageField
+              state={marksheet}
+              category={marksCategory}
+              current={assignment?.marks ?? null}
+              fieldError={fieldErrors?.marksWeightage?.[0]}
+            />
 
             <label
               htmlFor="assignment-allowLateSubmission"

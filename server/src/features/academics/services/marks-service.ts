@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 import { compareTypes, COMPONENTS, syncCourseCategories, syncSectionCategories, validateScheme } from "../lib/assessment-scheme";
 import { DEFAULT_GRADES, GRADE_LETTERS, type GradeRange, validateGrades } from "../lib/grading";
+import { assertItemWeightage, categoryLabel, nextItemTitle, SINGLE_TITLE } from "../lib/assessment-items";
 import { importAssignmentMarks } from "../lib/classwork-marks";
 import { conflictError, notFoundError } from "../lib/http";
 import { summarizeEnrollments, summarizeMarks, weightsFor } from "../lib/marks-summary";
@@ -14,17 +15,25 @@ import { assertTeachesOffering } from "../lib/self";
 
 type Viewer = { id: string; role: string };
 
-// Quizzes, assignments, projects and labs are numbered; mid, practical and final are single exams.
-const TITLE_PREFIX: Record<string, string> = { QUIZ: "Quiz", ASSIGNMENT: "Assignment", PROJECT: "Project", LAB: "Lab" };
-const SINGLE_TITLE: Record<string, string> = { MID: "Mid Term", PRACTICAL: "Practical Exam", FINAL: "Final Term" };
+const totalMarksField = z
+  .number({ error: "Total marks is required" })
+  .positive("Total marks must be greater than 0")
+  .max(1000, "Total marks is too large");
+// The item's share of the course percentage; null shares what its category has left.
+const weightageField = z
+  .number({ error: "Weightage must be a number" })
+  .gt(0, "Weightage must be more than 0")
+  .max(100, "Weightage cannot be more than 100")
+  .nullish();
 
-export const totalMarksSchema = z.object({
-  totalMarks: z.number({ error: "Total marks is required" }).positive("Total marks must be greater than 0").max(1000, "Total marks is too large"),
-});
-export const createAssessmentSchema = totalMarksSchema.extend({
+export const createAssessmentSchema = z.object({
+  totalMarks: totalMarksField,
+  weightage: weightageField,
   // A classroom assignment whose returned grades fill this item's marks.
   assignmentId: z.uuid("Pick a valid assignment").nullish(),
 });
+// Weightage left out keeps it as it is.
+export const updateAssessmentSchema = z.object({ totalMarks: totalMarksField, weightage: weightageField });
 export const saveMarksSchema = z.object({
   records: z.array(
     z.object({ enrollmentId: z.number().int(), obtained: z.number().min(0, "Marks cannot be negative").nullable() }),
@@ -73,7 +82,10 @@ export async function getMarksSheet(viewer: Viewer, sectionId: number, courseId:
     prisma.assessmentCategory.findMany({
       where: { courseId, sectionId },
       include: {
-        assessments: { orderBy: { createdAt: "asc" }, include: { assignment: { select: { id: true, title: true } } } },
+        assessments: {
+          orderBy: { createdAt: "asc" },
+          include: { assignment: { select: { id: true, title: true, status: true } } },
+        },
         courseAssessment: { select: { component: true } },
       },
     }),
@@ -105,12 +117,25 @@ export async function getMarksSheet(viewer: Viewer, sectionId: number, courseId:
       component: c.courseAssessment?.component ?? null,
       fromScheme: c.courseAssessmentId !== null,
       singleAssessment: Boolean(SINGLE_TITLE[c.type]),
-      assessments: c.assessments.map((a) => ({ id: a.id, title: a.title, totalMarks: a.totalMarks, assignment: a.assignment })),
+      // Item weightage already given out, so the dialogs can say how much is left.
+      allocated: c.assessments.reduce((sum, a) => sum + (a.weightage ?? 0), 0),
+      assessments: c.assessments.map((a) => ({
+        id: a.id,
+        title: a.title,
+        totalMarks: a.totalMarks,
+        weightage: a.weightage,
+        assignment: a.assignment,
+      })),
     })),
     classwork: classwork.map((a) => ({ id: a.id, title: a.title, points: a.points!, linked: a.assessment !== null })),
     students: enrollments.map((e) => {
       const obtainedBy = new Map(e.marks.map((m) => [m.assessmentId, m.obtained]));
-      const items = assessments.map((a) => ({ categoryId: a.categoryId, obtained: obtainedBy.get(a.id) ?? null, total: a.totalMarks }));
+      const items = assessments.map((a) => ({
+        categoryId: a.categoryId,
+        obtained: obtainedBy.get(a.id) ?? null,
+        total: a.totalMarks,
+        weightage: a.weightage,
+      }));
       return {
         enrollmentId: e.id,
         student: e.student,
@@ -134,7 +159,10 @@ async function loadCategory(viewer: Viewer, categoryId: number) {
 }
 
 async function loadAssessment(viewer: Viewer, assessmentId: number) {
-  const assessment = await prisma.assessment.findUnique({ where: { id: assessmentId }, include: { category: true } });
+  const assessment = await prisma.assessment.findUnique({
+    where: { id: assessmentId },
+    include: { category: true, assignment: { select: { title: true, deletedAt: true } } },
+  });
   if (!assessment) throw notFoundError("Assessment not found.");
   await assertTeachesOffering(viewer, assessment.category.sectionId, assessment.category.courseId);
   return assessment;
@@ -158,31 +186,36 @@ async function assertLinkableAssignment(sectionId: number, courseId: number, ass
   if (assignment.assessment) throw conflictError(`That assignment already feeds ${assignment.assessment.title}.`);
 }
 
-/** Adds the next item to a category ("Quiz 3"), or its single exam ("Mid Term"), optionally fed by an assignment. */
-export async function createAssessment(viewer: Viewer, categoryId: number, totalMarks: number, assignmentId?: string | null) {
+/**
+ * Adds the next item to a category ("Quiz 3"), or its single exam ("Mid Term"), optionally fed by an assignment.
+ * Its weightage has to fit in what the category has left.
+ */
+export async function createAssessment(viewer: Viewer, categoryId: number, input: z.infer<typeof createAssessmentSchema>) {
   const category = await loadCategory(viewer, categoryId);
-  if (assignmentId) await assertLinkableAssignment(category.sectionId, category.courseId, assignmentId);
-  const existing = await prisma.assessment.findMany({ where: { categoryId }, select: { title: true } });
-  let title: string;
-  if (SINGLE_TITLE[category.type]) {
-    if (existing.length > 0) throw conflictError(`${SINGLE_TITLE[category.type]} already exists.`);
-    title = SINGLE_TITLE[category.type];
-  } else {
-    // After the highest number so deleting "Quiz 2" of three doesn't repeat "Quiz 3".
-    const prefix = TITLE_PREFIX[category.type] ?? category.type;
-    const numbers = existing.map((a) => Number.parseInt(a.title.slice(prefix.length + 1), 10)).filter((n) => !Number.isNaN(n));
-    title = `${prefix} ${numbers.length ? Math.max(...numbers) + 1 : 1}`;
-  }
-  const created = await prisma.assessment.create({ data: { categoryId, title, totalMarks, assignmentId: assignmentId ?? null } });
-  if (assignmentId) await importAssignmentMarks(created.id);
+  if (input.assignmentId) await assertLinkableAssignment(category.sectionId, category.courseId, input.assignmentId);
+  await assertItemWeightage(prisma, category, input.weightage);
+  const title = await nextItemTitle(prisma, category);
+  const created = await prisma.assessment.create({
+    data: {
+      categoryId,
+      title,
+      totalMarks: input.totalMarks,
+      weightage: input.weightage ?? null,
+      assignmentId: input.assignmentId ?? null,
+    },
+  });
+  if (input.assignmentId) await importAssignmentMarks(created.id);
   return created;
 }
 
-export async function updateAssessment(viewer: Viewer, assessmentId: number, totalMarks: number) {
+export async function updateAssessment(viewer: Viewer, assessmentId: number, input: z.infer<typeof updateAssessmentSchema>) {
   const assessment = await loadAssessment(viewer, assessmentId);
+  const { totalMarks } = input;
+  if (input.weightage !== undefined) await assertItemWeightage(prisma, assessment.category, input.weightage, assessment.id);
+  const data = { totalMarks, ...(input.weightage !== undefined ? { weightage: input.weightage } : {}) };
   if (assessment.assignmentId) {
     // Linked marks are scaled from the assignment's grades, so re-scale them to the new total.
-    const updated = await prisma.assessment.update({ where: { id: assessment.id }, data: { totalMarks } });
+    const updated = await prisma.assessment.update({ where: { id: assessment.id }, data });
     await importAssignmentMarks(assessment.id);
     return updated;
   }
@@ -190,11 +223,18 @@ export async function updateAssessment(viewer: Viewer, assessmentId: number, tot
   if (highest._max.obtained !== null && highest._max.obtained > totalMarks) {
     throw badRequest(`A student already has ${highest._max.obtained} marks - the total can't be lower than that.`);
   }
-  return prisma.assessment.update({ where: { id: assessment.id }, data: { totalMarks } });
+  return prisma.assessment.update({ where: { id: assessment.id }, data });
 }
 
+/** Items that come from classroom classwork are removed from the classroom, so the two never disagree. */
 export async function deleteAssessment(viewer: Viewer, assessmentId: number) {
   const assessment = await loadAssessment(viewer, assessmentId);
+  if (assessment.assignment && !assessment.assignment.deletedAt) {
+    throw conflictError(
+      `${assessment.title} comes from the classroom assignment "${assessment.assignment.title}". ` +
+        "To take it off the marksheet, edit the assignment in Classwork and pick no marks category, or delete the assignment.",
+    );
+  }
   await prisma.assessment.delete({ where: { id: assessmentId } });
   return assessment;
 }
@@ -338,6 +378,7 @@ export async function saveScheme(courseId: number, input: z.infer<typeof schemeS
       );
     }
   }
+  await assertSchemeCoversItems(input.entries, matched);
   const ops: Prisma.PrismaPromise<unknown>[] = [
     prisma.course.update({ where: { id: courseId }, data: { theoryPercent: input.theoryPercent } }),
     prisma.courseAssessment.deleteMany({ where: { id: { in: removed.map((e) => e.id) } } }),
@@ -356,6 +397,33 @@ export async function saveScheme(courseId: number, input: z.infer<typeof schemeS
   });
   await prisma.$transaction(ops);
   await syncCourseCategories(prisma, courseId);
+}
+
+/**
+ * A scheme entry's weightage can't drop below what a section's items already
+ * carry in it (Assignments 20% with 15% given to items can go to 15%, not 10%).
+ */
+async function assertSchemeCoversItems(entries: z.infer<typeof schemeSchema>["entries"], matched: ({ id: number } | null)[]) {
+  const ids = matched.filter(Boolean).map((e) => e!.id);
+  if (ids.length === 0) return;
+  const categories = await prisma.assessmentCategory.findMany({
+    where: { courseAssessmentId: { in: ids }, assessments: { some: { weightage: { not: null } } } },
+    select: { courseAssessmentId: true, assessments: { select: { weightage: true } } },
+  });
+  const highest = new Map<number, number>();
+  for (const c of categories) {
+    const allocated = c.assessments.reduce((sum, a) => sum + (a.weightage ?? 0), 0);
+    highest.set(c.courseAssessmentId!, Math.max(highest.get(c.courseAssessmentId!) ?? 0, allocated));
+  }
+  entries.forEach((entry, i) => {
+    const allocated = matched[i] ? highest.get(matched[i]!.id) : undefined;
+    if (allocated !== undefined && entry.weightage < allocated - 0.001) {
+      throw conflictError(
+        `${categoryLabel(entry.type)} can't go below ${Math.round(allocated * 100) / 100}%: a section's items already carry that much of it. ` +
+          "Ask the teacher to lower those items' weightage first.",
+      );
+    }
+  });
 }
 
 // ---- Grades: generate and release ---------------------------------------------------------

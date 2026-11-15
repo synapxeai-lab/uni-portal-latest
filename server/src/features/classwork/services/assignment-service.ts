@@ -7,7 +7,13 @@ import {
 } from "@/features/classroom/services/classroom-service";
 import { ClassroomServiceError } from "@/features/classroom/lib/errors";
 import { notifyAssignmentPublished } from "@/features/notifications/services/notification-generator";
+import {
+  assertClassworkPlacement,
+  syncClassworkItem,
+  type ClassworkPlacement,
+} from "@/features/academics/lib/classwork-marks";
 import { recordAuditEvent } from "@/lib/audit-log";
+import { invalidateUniversity } from "@/lib/cache/tags";
 import { getFileAttachmentsByEntityIds, type AttachedFileSummary } from "@/lib/file-attachments";
 import { prisma } from "@/lib/prisma";
 import { deleteAttachment, uploadAttachments } from "@/lib/storage/file-service";
@@ -31,10 +37,15 @@ export interface AssignmentInput {
   points?: string;
   allowLateSubmission: boolean;
   topicId?: string;
+  /** Where it goes on the marksheet; null takes it off, undefined (edits) keeps it as it is. */
+  marks?: ClassworkPlacement | null;
 }
 
 function assignmentWithAuthorInclude() {
-  return { author: { select: { name: true } } } as const;
+  return {
+    author: { select: { name: true } },
+    assessment: { select: { title: true, weightage: true, category: { select: { type: true } } } },
+  } as const;
 }
 
 type AssignmentWithAuthor = Prisma.AssignmentGetPayload<{
@@ -60,7 +71,23 @@ function toAssignmentSummary(
     createdAt: assignment.createdAt,
     attachments,
     canManage,
+    // Only the teachers' edit dialog needs where it sits on the marksheet.
+    marks:
+      canManage && assignment.assessment
+        ? {
+            category: assignment.assessment.category.type,
+            title: assignment.assessment.title,
+            weightage: assignment.assessment.weightage,
+          }
+        : null,
   };
+}
+
+/** Puts the assignment's item on the marksheet in line with it; marks pages refresh when it changed. */
+async function syncMarksheet(assignmentId: string, marks: ClassworkPlacement | null | undefined, previousPoints: number | null) {
+  if (await syncClassworkItem(assignmentId, marks, previousPoints)) {
+    invalidateUniversity();
+  }
 }
 
 async function findActiveAssignmentOrThrow(assignmentId: string) {
@@ -220,6 +247,7 @@ export async function createAssignment(
   if (input.topicId) {
     await assertTopicBelongsToClassroom(input.topicId, classroomId);
   }
+  await assertClassworkPlacement(classroomId, input.marks);
 
   const created = await prisma.$transaction(async (tx) => {
     const assignment = await tx.assignment.create({
@@ -251,6 +279,10 @@ export async function createAssignment(
     return assignment;
   });
 
+  if (input.marks) {
+    await syncMarksheet(created.id, input.marks, null);
+  }
+
   if (status === AssignmentStatus.PUBLISHED) {
     await notifyAssignmentPublished({
       classroomId,
@@ -265,7 +297,10 @@ export async function createAssignment(
     [created.id],
     FileAttachmentType.ASSIGNMENT,
   );
-  return toAssignmentSummary(created, attachmentsByAssignmentId.get(created.id) ?? [], true);
+  const withItem = input.marks
+    ? await prisma.assignment.findUniqueOrThrow({ where: { id: created.id }, include: assignmentWithAuthorInclude() })
+    : created;
+  return toAssignmentSummary(withItem, attachmentsByAssignmentId.get(created.id) ?? [], true);
 }
 
 export async function updateAssignment(
@@ -284,6 +319,7 @@ export async function updateAssignment(
   if (input.topicId) {
     await assertTopicBelongsToClassroom(input.topicId, existing.classroomId);
   }
+  await assertClassworkPlacement(existing.classroomId, input.marks, assignmentId);
 
   const dueDate = input.dueDate ? new Date(input.dueDate) : null;
   const dueDateChanged = dueDate?.getTime() !== existing.dueDate?.getTime();
@@ -306,7 +342,7 @@ export async function updateAssignment(
     }
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const record = await tx.assignment.update({
       where: { id: assignmentId },
       data: {
@@ -327,6 +363,8 @@ export async function updateAssignment(
     return record;
   });
 
+  await syncMarksheet(assignmentId, input.marks, existing.points);
+
   // Editing only ever adds new attachments here - removing an existing one is
   // its own explicit action (removeAssignmentAttachment).
   await uploadAttachments({
@@ -340,7 +378,11 @@ export async function updateAssignment(
     [assignmentId],
     FileAttachmentType.ASSIGNMENT,
   );
-  return toAssignmentSummary(updated, attachmentsByAssignmentId.get(assignmentId) ?? [], true);
+  const withItem = await prisma.assignment.findUniqueOrThrow({
+    where: { id: assignmentId },
+    include: assignmentWithAuthorInclude(),
+  });
+  return toAssignmentSummary(withItem, attachmentsByAssignmentId.get(assignmentId) ?? [], true);
 }
 
 /**
@@ -431,6 +473,8 @@ export async function deleteAssignment(assignmentId: string, user: SessionUser):
     where: { id: assignmentId },
     data: { deletedAt: new Date() },
   });
+  // Deleted classwork leaves the marksheet, marks and all.
+  await syncMarksheet(assignmentId, null, existing.points);
 
   await recordAuditEvent({
     actorId: user.id,

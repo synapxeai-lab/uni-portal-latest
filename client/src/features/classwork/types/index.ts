@@ -45,4 +45,17 @@ export interface AssignmentSummary {
   attachments: AttachedFileSummary[];
   /** Whether the current viewer may edit/publish/close/delete this assignment. */
   canManage: boolean;
+  /** Its item on the course section's marksheet (teachers only), if it's on one. */
+  marks: { category: string; title: string; weightage: number | null } | null;
+}
+
+/** A marksheet category graded classwork can count in (from the course's assessment scheme). */
+export interface MarksCategoryOption {
+  type: string;
+  weightage: number | null;
+  /** Item weightage already given out in it. */
+  allocated: number;
+  items: number;
+  /** Mid, practical and final are single exams. */
+  singleAssessment: boolean;
 }

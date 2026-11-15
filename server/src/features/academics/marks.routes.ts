@@ -35,13 +35,8 @@ marksRouter.get("/marks/:sectionId/:courseId", requireTeacherOrAdmin, async (req
 });
 
 marksRouter.post("/marks/categories/:categoryId/assessments", requireTeacherOrAdmin, async (req, res) => {
-  const { totalMarks, assignmentId } = parseInput(marks.createAssessmentSchema, req.body);
-  const assessment = await marks.createAssessment(
-    currentUser(req),
-    intParam(req, "categoryId", "section ID"),
-    totalMarks,
-    assignmentId,
-  );
+  const input = parseInput(marks.createAssessmentSchema, req.body);
+  const assessment = await marks.createAssessment(currentUser(req), intParam(req, "categoryId", "section ID"), input);
   invalidateUniversity();
   done(res, { assessment, message: `${assessment.title} created.` }, 201);
 });
@@ -53,10 +48,10 @@ marksRouter.delete("/marks/categories/:categoryId", requireTeacherOrAdmin, async
 });
 
 marksRouter.put("/marks/assessments/:assessmentId", requireTeacherOrAdmin, async (req, res) => {
-  const { totalMarks } = parseInput(marks.totalMarksSchema, req.body);
-  await marks.updateAssessment(currentUser(req), intParam(req, "assessmentId", "assessment ID"), totalMarks);
+  const input = parseInput(marks.updateAssessmentSchema, req.body);
+  await marks.updateAssessment(currentUser(req), intParam(req, "assessmentId", "assessment ID"), input);
   invalidateUniversity();
-  done(res, { message: "Total marks updated." });
+  done(res, { message: "Assessment updated." });
 });
 
 marksRouter.delete("/marks/assessments/:assessmentId", requireTeacherOrAdmin, async (req, res) => {

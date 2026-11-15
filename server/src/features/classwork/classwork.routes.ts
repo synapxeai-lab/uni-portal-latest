@@ -12,6 +12,8 @@ import type { SessionUser } from "@/auth/session";
 import { AssignmentStatus, MaterialStatus } from "@/generated/prisma/enums";
 import { requireVisibleClassroom } from "@/features/classroom/classroom.routes";
 import { ClassroomServiceError } from "@/features/classroom/lib/errors";
+import { assertManagementAccess } from "@/features/classroom/services/classroom-service";
+import { classworkMarksCategories, type ClassworkPlacement } from "@/features/academics/lib/classwork-marks";
 
 import * as assignmentService from "./services/assignment-service";
 import * as materialService from "./services/material-service";
@@ -55,6 +57,13 @@ function classroomIdOf(req: Request): string {
     req.params,
     "Invalid classroom id.",
   ).classroomId;
+}
+
+/** The marksheet placement from the form: undefined keeps it, null takes it off. */
+function placementOf(input: { marksCategory?: string | null; marksWeightage: number | null }) {
+  if (input.marksCategory === undefined) return undefined;
+  if (input.marksCategory === null) return null;
+  return { category: input.marksCategory, weightage: input.marksWeightage } satisfies ClassworkPlacement;
 }
 
 function attachmentIdOf(req: Request): string {
@@ -136,6 +145,18 @@ classworkRouter.get("/assignments/:assignmentId", async (req, res) => {
     getCachedTopics(classroomId, user),
   ]);
   res.json({ assignment, topics });
+});
+
+/**
+ * The marks categories the assignment dialog offers (null when this classroom
+ * isn't a course section's). Read when the dialog opens, never cached, so the
+ * weightage left is current.
+ */
+classworkRouter.get("/marks-categories", async (req, res) => {
+  const user = currentUser(req);
+  const classroomId = classroomIdOf(req);
+  await assertManagementAccess(classroomId, user);
+  res.json({ categories: await classworkMarksCategories(classroomId) });
 });
 
 // ---- Topics -------------------------------------------------------------------
@@ -242,6 +263,7 @@ classworkRouter.post("/assignments", multipart, async (req, res) => {
       points: input.points,
       allowLateSubmission: input.allowLateSubmission,
       topicId: input.topicId,
+      marks: placementOf(input),
     },
     ASSIGNMENT_STATUS[input.status],
     extractUploadedFiles(req),
@@ -267,6 +289,7 @@ classworkRouter.patch("/assignments/:assignmentId", multipart, async (req, res) 
       points: input.points,
       allowLateSubmission: input.allowLateSubmission,
       topicId: input.topicId,
+      marks: placementOf(input),
     },
     extractUploadedFiles(req),
   );
