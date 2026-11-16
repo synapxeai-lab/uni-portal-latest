@@ -19,13 +19,20 @@ import type { Prisma } from "@/generated/prisma/client";
 import {
   ActivityAction,
   AnnouncementStatus,
+  AssignmentStatus,
   ClassroomStatus,
   CommentVisibility,
   FileAttachmentType,
+  MaterialStatus,
 } from "@/generated/prisma/enums";
 import type { ScheduleAdapter, SchedulableRecord } from "@/lib/scheduling/types";
 
-import type { AnnouncementAttachmentSummary, AnnouncementSummary, CommentSummary } from "../types";
+import type {
+  AnnouncementAttachmentSummary,
+  AnnouncementSummary,
+  CommentSummary,
+  StreamClassworkItem,
+} from "../types";
 
 // An announcement is considered "edited" if it was updated meaningfully after
 // creation - a small threshold avoids flagging clock-precision no-ops as edits.
@@ -164,6 +171,78 @@ export async function listClassroomAnnouncements(
       canModerate,
     ),
   );
+}
+
+const streamAuthorSelect = { select: { id: true, name: true, image: true, avatarUrl: true } } as const;
+
+/**
+ * Published classwork for the stream, newest first. Only what the class has
+ * been given: drafts and scheduled items stay off the stream for everyone,
+ * including the teacher, until they publish.
+ */
+export async function listStreamClasswork(classroomId: string): Promise<StreamClassworkItem[]> {
+  const [assignments, materials] = await Promise.all([
+    prisma.assignment.findMany({
+      where: {
+        classroomId,
+        deletedAt: null,
+        status: { in: [AssignmentStatus.PUBLISHED, AssignmentStatus.CLOSED] },
+      },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+        points: true,
+        publishedAt: true,
+        createdAt: true,
+        author: streamAuthorSelect,
+      },
+    }),
+    prisma.material.findMany({
+      where: { classroomId, deletedAt: null, status: MaterialStatus.PUBLISHED },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        publishedAt: true,
+        createdAt: true,
+        author: streamAuthorSelect,
+      },
+    }),
+  ]);
+
+  const author = (a: { id: string; name: string; image: string | null; avatarUrl: string | null }) => ({
+    id: a.id,
+    name: a.name,
+    image: a.image ?? a.avatarUrl ?? null,
+  });
+
+  return [
+    ...assignments.map(
+      (a): StreamClassworkItem => ({
+        kind: "ASSIGNMENT",
+        id: a.id,
+        title: a.title,
+        materialType: null,
+        postedAt: a.publishedAt ?? a.createdAt,
+        dueDate: a.dueDate,
+        points: a.points,
+        author: author(a.author),
+      }),
+    ),
+    ...materials.map(
+      (m): StreamClassworkItem => ({
+        kind: "MATERIAL",
+        id: m.id,
+        title: m.title,
+        materialType: m.type,
+        postedAt: m.publishedAt ?? m.createdAt,
+        dueDate: null,
+        points: null,
+        author: author(m.author),
+      }),
+    ),
+  ].sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
 }
 
 export async function createAnnouncement(
@@ -421,7 +500,7 @@ export async function createComment(
 export async function getStreamVersion(classroomId: string, viewer: SessionUser): Promise<string> {
   await assertMembership(classroomId, viewer);
 
-  const [announcements, comments] = await Promise.all([
+  const [announcements, comments, assignments, materials] = await Promise.all([
     prisma.announcement.aggregate({
       where: { classroomId },
       _count: { _all: true },
@@ -432,6 +511,17 @@ export async function getStreamVersion(classroomId: string, viewer: SessionUser)
       _count: { _all: true },
       _max: { updatedAt: true },
     }),
+    // Classwork shows in the stream too, so posting, publishing or deleting it changes the version.
+    prisma.assignment.aggregate({
+      where: { classroomId },
+      _count: { _all: true },
+      _max: { updatedAt: true },
+    }),
+    prisma.material.aggregate({
+      where: { classroomId },
+      _count: { _all: true },
+      _max: { updatedAt: true },
+    }),
   ]);
 
   return [
@@ -439,6 +529,10 @@ export async function getStreamVersion(classroomId: string, viewer: SessionUser)
     announcements._max.updatedAt?.getTime() ?? 0,
     comments._count._all,
     comments._max.updatedAt?.getTime() ?? 0,
+    assignments._count._all,
+    assignments._max.updatedAt?.getTime() ?? 0,
+    materials._count._all,
+    materials._max.updatedAt?.getTime() ?? 0,
   ].join(":");
 }
 

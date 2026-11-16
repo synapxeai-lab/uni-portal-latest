@@ -119,6 +119,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
       `/classrooms/${ctx.classroomId}`,
       `/classrooms/${ctx.classroomId}/people`,
       `/classrooms/${ctx.classroomId}/stream`,
+      `/classrooms/${ctx.classroomId}/stream/classwork`,
       `/classrooms/${ctx.classroomId}/stream/version`,
       `/classrooms/${ctx.classroomId}/classwork`,
     );

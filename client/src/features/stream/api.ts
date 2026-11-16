@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, apiAction, apiGet } from "@/lib/api";
 
-import type { ActionResult, AnnouncementSummary, CommentSummary } from "./types";
+import type { ActionResult, AnnouncementSummary, CommentSummary, StreamClassworkItem } from "./types";
 
 export const streamKeys = {
   announcements: (classroomId: string) => ["stream", classroomId] as const,
+  // Under ["stream", id], so refreshing the stream refreshes its classwork posts too.
+  classwork: (classroomId: string) => ["stream", classroomId, "classwork"] as const,
   version: (classroomId: string) => ["stream-version", classroomId] as const,
 };
 
@@ -13,6 +15,15 @@ export function useAnnouncements(classroomId: string) {
   return useQuery({
     queryKey: streamKeys.announcements(classroomId),
     queryFn: () => apiGet<AnnouncementSummary[]>(`/classrooms/${classroomId}/stream`),
+  });
+}
+
+/** Published assignments and materials, shown in students' stream alongside announcements. */
+export function useStreamClasswork(classroomId: string, enabled = true) {
+  return useQuery({
+    queryKey: streamKeys.classwork(classroomId),
+    enabled,
+    queryFn: () => apiGet<StreamClassworkItem[]>(`/classrooms/${classroomId}/stream/classwork`),
   });
 }
 

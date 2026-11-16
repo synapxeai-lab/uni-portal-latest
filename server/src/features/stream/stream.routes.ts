@@ -53,6 +53,21 @@ streamRouter.get("/stream", async (req, res) => {
   res.json(announcements);
 });
 
+/** Published assignments and materials, shown in the stream alongside announcements. */
+streamRouter.get("/stream/classwork", async (req, res) => {
+  const user = currentUser(req);
+  const classroomId = classroomIdOf(req);
+  await requireVisibleClassroom(classroomId, user);
+
+  // The same for every member (only published items), so one entry per classroom.
+  const items = await cached(
+    `stream-classwork:${classroomId}`,
+    { ttl: CacheTtl.CLASSROOM, tags: [CacheTags.ACADEMIC, CacheTags.classroom(classroomId)] },
+    () => streamService.listStreamClasswork(classroomId),
+  );
+  res.json(items);
+});
+
 /**
  * Change fingerprint for the stream, polled every few seconds by open stream
  * pages to pick up other members' posts and comments. Never cached.

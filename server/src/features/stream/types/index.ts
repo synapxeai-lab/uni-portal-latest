@@ -37,3 +37,17 @@ export interface AnnouncementSummary {
   /** Whether the current viewer may edit/delete/pin this announcement. */
   canManage: boolean;
 }
+
+/** A published assignment or material, shown in the stream as "X posted a new …". */
+export interface StreamClassworkItem {
+  kind: "ASSIGNMENT" | "MATERIAL";
+  id: string;
+  title: string;
+  /** DOCUMENT, LINK, VIDEO, IMAGE or OTHER for a material; null for an assignment. */
+  materialType: string | null;
+  /** When it went out to the class (publish time, or creation for items posted straight away). */
+  postedAt: Date;
+  dueDate: Date | null;
+  points: number | null;
+  author: { id: string; name: string; image: string | null };
+}

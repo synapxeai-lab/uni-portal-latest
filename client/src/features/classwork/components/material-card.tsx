@@ -1,10 +1,13 @@
 import { ExternalLink, FileText, ImageIcon, Link2, Paperclip, Video } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { AttachmentList } from "@/components/files/attachment-list";
 import { MaterialType } from "@portal/shared/enums";
 import { ContentStatusBadge } from "@/features/scheduling/components/content-status-badge";
+import { cn } from "@/lib/utils";
 
 import type { MaterialSummary, TopicSummary } from "../types";
 import { MaterialManagementMenu } from "./material-management-menu";
@@ -25,9 +28,16 @@ interface MaterialCardProps {
 
 export function MaterialCard({ material, classroomId, topics }: MaterialCardProps) {
   const Icon = TYPE_ICON[material.type];
+  // The stream links here as #material-<id>: bring that material into view and outline it.
+  const { hash } = useLocation();
+  const targeted = hash === `#material-${material.id}`;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (targeted) ref.current?.scrollIntoView({ block: "center" });
+  }, [targeted]);
 
   return (
-    <Card>
+    <Card ref={ref} id={`material-${material.id}`} className={cn("scroll-mt-24", targeted && "ring-2 ring-primary")}>
       <CardContent className="flex items-start gap-3 p-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
           <Icon className="h-4 w-4 text-link dark:text-foreground" aria-hidden />

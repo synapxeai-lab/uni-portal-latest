@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { canManageClassroom } from "@/features/classroom/lib/can-manage";
-import { useAnnouncements } from "@/features/stream/api";
+import { useAnnouncements, useStreamClasswork } from "@/features/stream/api";
 import { AnnouncementComposer } from "@/features/stream/components/announcement-composer";
 import { AnnouncementList } from "@/features/stream/components/announcement-list";
 import { StreamFreshnessProvider } from "@/features/stream/components/stream-freshness";
@@ -16,6 +16,14 @@ export default function StreamPage() {
   const classroom = useCurrentClassroom();
   const user = useSession().data?.user;
   const announcements = useAnnouncements(classroom.id);
+  // "X posted a new assignment" posts are for students: whoever teaches the class posted the
+  // work themselves, so teachers, co-teachers and admins don't get them (nor fetch them).
+  const showClasswork = !canManageClassroom(classroom.role);
+  // Loads in parallel with the announcements. The feed waits for both, so the "New" badges'
+  // snapshot of what was already there includes the classwork posts.
+  const classworkQuery = useStreamClasswork(classroom.id, showClasswork);
+  const classwork = showClasswork ? (classworkQuery.data ?? []) : [];
+  const classworkLoading = showClasswork && classworkQuery.isPending && !classworkQuery.isError;
 
   const archived = classroom.status === "ARCHIVED";
   const canPost = canManageClassroom(classroom.role) && !archived;
@@ -34,6 +42,9 @@ export default function StreamPage() {
         notFound={<ClassroomNotFound />}
       >
         {(list) => {
+          if (classworkLoading) {
+            return <StreamSkeleton />;
+          }
           // Archived classrooms are read-only - per-item management menus and
           // the comment box are disabled by stripping canManage here. The
           // server independently enforces this too (assertClassroomActive).
@@ -42,14 +53,18 @@ export default function StreamPage() {
             : list;
           return (
             <StreamFreshnessProvider
-              initialIds={list.flatMap((announcement) => [
-                announcement.id,
-                ...announcement.comments.map((comment) => comment.id),
-              ])}
+              initialIds={[
+                ...list.flatMap((announcement) => [
+                  announcement.id,
+                  ...announcement.comments.map((comment) => comment.id),
+                ]),
+                ...classwork.map((item) => item.id),
+              ]}
               viewerId={currentUser.id}
             >
               <AnnouncementList
                 announcements={visibleAnnouncements}
+                classwork={classwork}
                 classroomId={classroom.id}
                 currentUser={currentUser}
                 archived={archived}
