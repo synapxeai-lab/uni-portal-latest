@@ -68,6 +68,40 @@ function matching(list: ClassroomSummary[], filters: ClassFilters, except?: keyo
 
 export const filterClasses = (list: ClassroomSummary[], filters: ClassFilters) => matching(list, filters);
 
+export interface DiplomaGroup {
+  key: string;
+  /** "DTM · Diploma in Tourism Management", or "Other classes" for classes outside any course. */
+  title: string;
+  classes: ClassroomSummary[];
+}
+
+/** Classes grouped under their diploma, in diploma-code order, with "Other classes" last. */
+export function groupByDiploma(list: ClassroomSummary[]): DiplomaGroup[] {
+  const groups = new Map<string, DiplomaGroup & { code: string }>();
+  for (const c of list) {
+    const d = c.offering?.diploma;
+    const key = d ? String(d.id) : OTHER;
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, code: d?.code ?? "", title: d ? `${d.code} · ${d.name}` : "Other classes", classes: [] };
+      groups.set(key, group);
+    }
+    group.classes.push(c);
+  }
+  return [...groups.values()]
+    .sort((a, b) => (a.key === OTHER ? 1 : b.key === OTHER ? -1 : a.code.localeCompare(b.code)))
+    .map(({ code: _code, ...group }) => ({ ...group, classes: group.classes.sort(byCohort) }));
+}
+
+/** Newest batch first, then section, then course name. */
+function byCohort(a: ClassroomSummary, b: ClassroomSummary) {
+  return (
+    (b.offering?.batch ?? "").localeCompare(a.offering?.batch ?? "", undefined, { numeric: true }) ||
+    (a.offering?.sectionLabel ?? "").localeCompare(b.offering?.sectionLabel ?? "") ||
+    a.title.localeCompare(b.title)
+  );
+}
+
 export function ClassesFilters({
   list,
   filters,
@@ -86,24 +120,25 @@ export function ClassesFilters({
 }) {
   const categories = useProgrammeCategories().data?.categories ?? [];
 
-  // Programme pills: only programmes that have classes, plus "Other" for classes outside any course.
+  // Programme pills: every programme (even one with no classes yet), in the portal's order,
+  // plus "Other" for classes outside any course.
   const forProgramme = matching(list, filters, "programme");
-  const programmes = unique(list.flatMap((c) => (c.offering ? [c.offering.programme] : [])));
+  const known = new Set(categories.map((c) => c.key));
+  const programmes = [
+    ...categories.map((c) => ({ key: c.key, label: shortProgrammeLabel(c.label) })),
+    ...unique(list.flatMap((c) => (c.offering && !known.has(c.offering.programme) ? [c.offering.programme] : []))).map((key) => ({
+      key,
+      label: key,
+    })),
+  ];
   const hasOther = list.some((c) => !c.offering);
   const programmeOptions = [
     { value: "", label: "All", count: forProgramme.length },
-    ...programmes
-      .map((key) => {
-        const category = categories.find((c) => c.key === key);
-        return {
-          value: key,
-          label: category ? shortProgrammeLabel(category.label) : key,
-          count: forProgramme.filter((c) => c.offering?.programme === key).length,
-          position: category ? categories.indexOf(category) : categories.length,
-        };
-      })
-      .sort((a, b) => a.position - b.position)
-      .map(({ position: _position, ...option }) => option),
+    ...programmes.map(({ key, label }) => ({
+      value: key,
+      label,
+      count: forProgramme.filter((c) => c.offering?.programme === key).length,
+    })),
     ...(hasOther ? [{ value: OTHER, label: "Other", count: forProgramme.filter((c) => !c.offering).length }] : []),
   ];
 

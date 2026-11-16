@@ -7,8 +7,9 @@ import { CardGridSkeleton, PageHeaderSkeleton } from "@/components/states/skelet
 import { UserRole } from "@portal/shared/enums";
 import { useClassrooms } from "@/features/classroom/api";
 import { ClassesPageActions } from "@/features/classroom/components/classes-page-actions";
-import { ClassesFilters, filterClasses, useClassFilters } from "@/features/classroom/components/classes-filters";
+import { ClassesFilters, filterClasses, groupByDiploma, useClassFilters } from "@/features/classroom/components/classes-filters";
 import { ClassroomCard } from "@/features/classroom/components/classroom-card";
+import type { ClassroomSummary } from "@/features/classroom/types";
 import { QueryView } from "@/app/route-states";
 import { useSession } from "@/lib/auth";
 
@@ -18,6 +19,16 @@ export function ClassesLoading() {
       <PageHeaderSkeleton />
       <CardGridSkeleton />
     </PageContainer>
+  );
+}
+
+function ClassGrid({ classes }: { classes: ClassroomSummary[] }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      {classes.map((classroom) => (
+        <ClassroomCard key={classroom.id} classroom={classroom} />
+      ))}
+    </div>
   );
 }
 
@@ -56,12 +67,23 @@ export default function ClassesPage() {
                 ) : null}
                 {shown.length === 0 ? (
                   <EmptyState icon={SearchX} title="No classes match these filters" description="Change or clear the filters to see more." />
-                ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                    {shown.map((classroom) => (
-                      <ClassroomCard key={classroom.id} classroom={classroom} />
+                ) : canCreate ? (
+                  // Grouped by diploma so a long list reads diploma by diploma.
+                  <div className="flex flex-col gap-8">
+                    {groupByDiploma(shown).map((group) => (
+                      <section key={group.key} aria-labelledby={`diploma-${group.key}`} className="flex flex-col gap-3">
+                        <h2 id={`diploma-${group.key}`} className="flex items-baseline gap-2 border-b pb-2 text-base font-semibold">
+                          <span className="min-w-0 truncate">{group.title}</span>
+                          <span className="shrink-0 text-sm font-normal text-muted-foreground">
+                            {group.classes.length} class{group.classes.length === 1 ? "" : "es"}
+                          </span>
+                        </h2>
+                        <ClassGrid classes={group.classes} />
+                      </section>
                     ))}
                   </div>
+                ) : (
+                  <ClassGrid classes={shown} />
                 )}
               </>
             )}

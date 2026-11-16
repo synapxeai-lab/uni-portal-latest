@@ -5,6 +5,7 @@ import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
 import { EmptyState } from "@/components/states/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import Link from "@/components/ui/link";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,6 +38,41 @@ interface AssignmentCourse {
   }[];
 }
 
+/** A teacher picked in a row's dropdown, waiting for the admin to confirm it. */
+interface PendingAssignment {
+  course: AssignmentCourse;
+  row: AssignmentCourse["rows"][number];
+  teacherId: number | null;
+}
+
+function confirmText({ course, row, teacherId }: PendingAssignment, label: (id: number) => string) {
+  const where = `${course.name} (${course.code}), ${row.section.batch} · Section ${row.section.label}`;
+  const current = row.teacher ? label(row.teacher.id) : null;
+  const classroom = row.offered ? " They'll also own its classroom." : "";
+  if (teacherId === null) {
+    return {
+      title: "Remove the teacher?",
+      description: `${current} will no longer be the assigned teacher of ${where}.`,
+      confirmLabel: "Remove teacher",
+      destructive: true,
+    };
+  }
+  const next = label(teacherId);
+  return current
+    ? {
+        title: "Replace the teacher?",
+        description: `${next} will replace ${current} as the teacher of ${where}.${
+          row.offered ? ` ${next} will own its classroom and ${current} will leave it.` : ""
+        }`,
+        confirmLabel: "Replace teacher",
+      }
+    : {
+        title: "Assign this teacher?",
+        description: `${next} will teach ${where}.${classroom}`,
+        confirmLabel: "Assign teacher",
+      };
+}
+
 /**
  * Assign teachers: one row per course and section. The teacher of an offered
  * course owns its classroom; before it's offered the teacher is only planned.
@@ -53,6 +89,7 @@ export default function AssignTeachersPage() {
   const teachers = useUniversityQuery<{ teachers: TeacherRecord[] }>("/teachers").data?.teachers ?? [];
   const teacherLabels = useMemo(() => personLabels(teachers), [teachers]);
   const [saving, setSaving] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAssignment | null>(null);
 
   return (
     <PageContainer>
@@ -137,15 +174,14 @@ export default function AssignTeachersPage() {
                             aria-label={`Teacher for ${course.code} section ${row.section.label}`}
                             value={row.teacher?.id ?? ""}
                             disabled={saving === row.key}
-                            onChange={async (e) => {
-                              setSaving(row.key);
-                              await runAction(
-                                universityAction("put", `/assignments/${row.sectionId}/${row.courseId}`, {
-                                  teacherId: e.target.value ? Number(e.target.value) : null,
-                                }),
-                              );
-                              setSaving(null);
-                            }}
+                            // The dropdown shows the saved teacher until the admin confirms, so Cancel leaves it as it was.
+                            onChange={(e) =>
+                              setPending({
+                                course,
+                                row,
+                                teacherId: e.target.value ? Number(e.target.value) : null,
+                              })
+                            }
                           >
                             <option value="">Not assigned</option>
                             {teachers.map((teacher) => (
@@ -164,6 +200,26 @@ export default function AssignTeachersPage() {
           )
         }
       </QueryView>
+      {pending ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open && !saving) setPending(null);
+          }}
+          {...confirmText(pending, (id) => teacherLabels.get(id) ?? "this teacher")}
+          pending={saving === pending.row.key}
+          onConfirm={async () => {
+            setSaving(pending.row.key);
+            const ok = await runAction(
+              universityAction("put", `/assignments/${pending.row.sectionId}/${pending.row.courseId}`, {
+                teacherId: pending.teacherId,
+              }),
+            );
+            setSaving(null);
+            if (ok) setPending(null);
+          }}
+        />
+      ) : null}
     </PageContainer>
   );
 }
