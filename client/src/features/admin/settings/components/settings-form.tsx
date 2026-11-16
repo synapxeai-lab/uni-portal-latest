@@ -47,7 +47,8 @@ function SettingsCheckbox({
   );
 }
 
-export function SettingsForm({ settings }: { settings: SystemSettings }) {
+/** `onSaved` runs after a successful save (the platform settings popup closes itself). */
+export function SettingsForm({ settings, onSaved }: { settings: SystemSettings; onSaved?: () => void }) {
   const [state, formAction, isPending] = useActionState(updateSettingsAction, initialState);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function SettingsForm({ settings }: { settings: SystemSettings }) {
     }
     if (state.status === "success") {
       toast.success("Settings saved.");
+      onSaved?.();
     } else if (!state.fieldErrors) {
       toast.error(state.message);
     }

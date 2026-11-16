@@ -86,6 +86,8 @@ export const navSections: NavSection[] = [
       { label: "Archived classes", href: "/archived", icon: Archive },
     ],
   },
+  // Admin groups follow the old University Portal: Academics · People ·
+  // Assessment · Finance · Administration. Students' own pages share Academics.
   {
     label: "Academics",
     items: [
@@ -95,11 +97,6 @@ export const navSections: NavSection[] = [
       { label: "Marks", href: "/my-marks", icon: BookCheck, roles: [UserRole.STUDENT] },
       { label: "Transcript", href: "/transcript", icon: FileText, roles: [UserRole.STUDENT] },
       { label: "Fee challan", href: "/fee-challan", icon: Receipt, roles: [UserRole.STUDENT] },
-    ],
-  },
-  {
-    label: "University",
-    items: [
       {
         label: "Programmes",
         href: "/admin/programmes",
@@ -115,8 +112,6 @@ export const navSections: NavSection[] = [
         roles: [UserRole.ADMIN],
         matches: ["/admin/sections"],
       },
-      { label: "Teachers", href: "/admin/teachers", icon: Presentation, roles: [UserRole.ADMIN] },
-      { label: "Students", href: "/admin/students", icon: Backpack, roles: [UserRole.ADMIN] },
       {
         label: "Registration",
         href: "/admin/registration",
@@ -124,10 +119,6 @@ export const navSections: NavSection[] = [
         roles: [UserRole.ADMIN],
       },
       { label: "Offer courses", href: "/admin/offerings", icon: ListPlus, roles: [UserRole.ADMIN] },
-      { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck, roles: [UserRole.ADMIN] },
-      { label: "Marks", href: "/marks", icon: BookCheck, roles: [UserRole.ADMIN] },
-      { label: "Grades", href: "/admin/grades", icon: Award, roles: [UserRole.ADMIN] },
-      { label: "Fees", href: "/admin/fees", icon: Receipt, roles: [UserRole.ADMIN] },
       {
         label: "Assign teachers",
         href: "/admin/assign-teachers",
@@ -137,11 +128,30 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    label: "Admin",
+    label: "People",
+    items: [
+      { label: "Teachers", href: "/admin/teachers", icon: Presentation, roles: [UserRole.ADMIN] },
+      { label: "Students", href: "/admin/students", icon: Backpack, roles: [UserRole.ADMIN] },
+      { label: "Users", href: "/admin/users", icon: Users, roles: [UserRole.ADMIN] },
+    ],
+  },
+  {
+    label: "Assessment",
+    items: [
+      { label: "Attendance", href: "/admin/attendance", icon: CalendarCheck, roles: [UserRole.ADMIN] },
+      { label: "Marks", href: "/marks", icon: BookCheck, roles: [UserRole.ADMIN] },
+      { label: "Grades", href: "/admin/grades", icon: Award, roles: [UserRole.ADMIN] },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [{ label: "Fees", href: "/admin/fees", icon: Receipt, roles: [UserRole.ADMIN] }],
+  },
+  {
+    label: "Administration",
     items: [
       // No separate "Admin Dashboard" entry: "Dashboard" (/dashboard) already
       // shows admins the platform-wide dashboard, and /admin redirects there.
-      { label: "Users", href: "/admin/users", icon: Users, roles: [UserRole.ADMIN] },
       {
         label: "Classrooms",
         href: "/admin/classrooms",
@@ -160,8 +170,8 @@ export const navSections: NavSection[] = [
         icon: ScrollText,
         roles: [UserRole.ADMIN],
       },
-      // Platform settings are a section of /settings (shown to admins only),
-      // so there's no separate admin nav entry for them.
+      // Platform settings open from Settings (admins only), so there's no
+      // separate admin nav entry for them.
     ],
   },
   {

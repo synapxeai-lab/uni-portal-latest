@@ -166,7 +166,7 @@ const hasPay = (t: TeacherPay["teachers"][number]) => t.pay > 0;
 
 function TeachersPay() {
   const query = useUniversityQuery<TeacherPay>("/teachers-pay");
-  const [filter, setFilter] = useState<PayFilter>("ALL");
+  const [filter, setFilter] = useState<PayFilter>("ASSIGNED");
   return (
     <QueryView query={query} loading={<AdminLoading />}>
       {({ teachers }) => {
