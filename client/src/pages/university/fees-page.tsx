@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BadgeCheck, RefreshCw, Receipt } from "lucide-react";
 
+import { FilterPills } from "@/components/classic/classic";
 import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
 import { EmptyState } from "@/components/states/empty-state";
@@ -158,55 +159,85 @@ function Challans() {
   );
 }
 
+type PayFilter = "ALL" | "ASSIGNED" | "UNASSIGNED";
+
+/** Assigned: the teacher has pay (a salary, or credit hours at a rate). Unassigned: pay is 0. */
+const hasPay = (t: TeacherPay["teachers"][number]) => t.pay > 0;
+
 function TeachersPay() {
   const query = useUniversityQuery<TeacherPay>("/teachers-pay");
+  const [filter, setFilter] = useState<PayFilter>("ALL");
   return (
     <QueryView query={query} loading={<AdminLoading />}>
-      {({ teachers }) => (
-        <TableCard>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Teacher</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Teaching</TableHead>
-                <TableHead className="text-right">Credit hours</TableHead>
-                <TableHead className="text-right">Pay</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teachers.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell>
-                    <span className="flex flex-col">
-                      <span className="font-semibold">{t.name}</span>
-                      <span className="text-xs text-muted-foreground">{t.email}</span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {t.type === "VISITING" ? `Visiting · ${formatRs(t.ratePerCreditHour)}/credit hr` : "Permanent"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {t.courses.length === 0 ? (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      ) : (
-                        t.courses.map((c) => (
-                          <Badge key={c.id} variant="outline">
-                            {c.course.code} {c.section.batch}-{c.section.label}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{t.creditHours}</TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">{formatRs(t.pay)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableCard>
-      )}
+      {({ teachers }) => {
+        const assigned = teachers.filter(hasPay);
+        const shown =
+          filter === "ASSIGNED" ? assigned : filter === "UNASSIGNED" ? teachers.filter((t) => !hasPay(t)) : teachers;
+        return (
+          <div className="flex flex-col gap-4">
+            <FilterPills<PayFilter>
+              label="Pay"
+              value={filter}
+              onChange={setFilter}
+              options={[
+                { value: "ALL", label: "All", count: teachers.length },
+                { value: "ASSIGNED", label: "Assigned", count: assigned.length },
+                { value: "UNASSIGNED", label: "Unassigned", count: teachers.length - assigned.length },
+              ]}
+            />
+            {shown.length === 0 ? (
+              <EmptyState
+                icon={Receipt}
+                title={filter === "ASSIGNED" ? "No teacher has pay yet" : "Every teacher has pay"}
+              />
+            ) : (
+              <TableCard>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Teacher</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Teaching</TableHead>
+                      <TableHead className="text-right">Credit hours</TableHead>
+                      <TableHead className="text-right">Pay</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {shown.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell>
+                          <span className="flex flex-col">
+                            <span className="font-semibold">{t.name}</span>
+                            <span className="text-xs text-muted-foreground">{t.email}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {t.type === "VISITING" ? `Visiting · ${formatRs(t.ratePerCreditHour)}/credit hr` : "Permanent"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {t.courses.length === 0 ? (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            ) : (
+                              t.courses.map((c) => (
+                                <Badge key={c.id} variant="outline">
+                                  {c.course.code} {c.section.batch}-{c.section.label}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{t.creditHours}</TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">{formatRs(t.pay)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableCard>
+            )}
+          </div>
+        );
+      }}
     </QueryView>
   );
 }
