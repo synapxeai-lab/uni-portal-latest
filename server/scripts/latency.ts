@@ -111,6 +111,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     endpoints.push(
       `/attendance/${ctx.offering.sectionId}/${ctx.offering.courseId}`,
       `/marks/${ctx.offering.sectionId}/${ctx.offering.courseId}`,
+      ...(role === "admin" ? [`/attendance/${ctx.offering.sectionId}/${ctx.offering.courseId}/register`] : []),
     );
   }
   if (ctx.classroomId) {

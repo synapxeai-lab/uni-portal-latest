@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, SquarePen } from "lucide-react";
 
 import { PageContainer } from "@/components/page/page-container";
 import { SectionHeader } from "@/components/page/section-header";
@@ -30,7 +30,7 @@ interface Overview {
 
 const rateVariant = (p: number | null) => (p === null ? "secondary" : p >= 75 ? "success" : p >= 60 ? "warning" : "destructive");
 
-/** Admin: attendance across every offering; each opens its classroom's Attendance tab. */
+/** Admin: attendance across every offering; Edit attendance changes days its teacher has taken. */
 export default function AttendanceOverviewPage() {
   const [category, setCategory] = useState("");
   const categories = useProgrammeCategories().data?.categories ?? [];
@@ -40,8 +40,15 @@ export default function AttendanceOverviewPage() {
     <PageContainer>
       <SectionHeader
         title="Attendance"
-        description="Attendance is taken in each course's classroom. Rates below 75% are highlighted."
+        description="Teachers take attendance for their courses; change a day they've taken on Edit attendance. Rates below 75% are highlighted."
         breadcrumbs={[{ label: "Attendance" }]}
+        actions={
+          <Button asChild>
+            <Link href="/admin/attendance/edit">
+              <SquarePen /> Edit attendance
+            </Link>
+          </Button>
+        }
       />
       <Select className="sm:max-w-xs" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Programme">
         <option value="">All programmes</option>
@@ -88,11 +95,9 @@ export default function AttendanceOverviewPage() {
                         <Badge variant={rateVariant(o.percentage)}>{o.percentage === null ? "No data" : `${o.percentage}%`}</Badge>
                       </TableCell>
                       <TableCell>
-                        {o.classroomId ? (
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/attendance/${o.sectionId}/${o.courseId}`}>Open</Link>
-                          </Button>
-                        ) : null}
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/admin/attendance/edit?section=${o.sectionId}&course=${o.courseId}`}>Edit attendance</Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -65,6 +65,7 @@ const DEFAULT_PAGES = {
     "/admin/assign-teachers",
     "/admin/registration",
     "/admin/attendance",
+    "/admin/attendance/edit",
     "/admin/grades",
     "/marks",
     "/attendance",

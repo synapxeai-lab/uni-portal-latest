@@ -11,8 +11,8 @@ import { assertTeachesOffering } from "./lib/self";
 import * as attendance from "./services/attendance-service";
 
 /**
- * Attendance per offering (course in a section): taken by its teacher or an
- * admin, shown to students for their own courses.
+ * Attendance per offering (course in a section): taken by its teacher, fixed
+ * by an admin when needed, shown to students for their own courses.
  */
 export const attendanceRouter = Router();
 
@@ -29,6 +29,23 @@ attendanceRouter.get("/attendance", requireAdmin, async (req, res) => {
   res.json({ offerings: await read(`attendance:overview:${category ?? ""}`, () => attendance.attendanceOverview({ category })) });
 });
 
+// ---- Admin: Edit attendance (a course section's whole register) ---------------------------
+
+attendanceRouter.get("/attendance/:sectionId/:courseId/register", requireAdmin, async (req, res) => {
+  const { sectionId, courseId } = offeringParams(req);
+  const offering = await assertTeachesOffering(currentUser(req), sectionId, courseId);
+  const data = await read(`attendance:register:${sectionId}:${courseId}`, () => attendance.getRegister(courseId, sectionId));
+  res.json({ offering, ...data });
+});
+
+attendanceRouter.put("/attendance/:sectionId/:courseId/register", requireAdmin, async (req, res) => {
+  const { sectionId, courseId } = offeringParams(req);
+  await assertTeachesOffering(currentUser(req), sectionId, courseId);
+  const result = await attendance.saveRegisterChanges(courseId, sectionId, parseInput(attendance.registerChangesSchema, req.body));
+  invalidateUniversity();
+  done(res, { ...result, message: `Attendance updated (${result.saved} change${result.saved === 1 ? "" : "s"}).` });
+});
+
 attendanceRouter.get("/attendance/:sectionId/:courseId", async (req, res) => {
   const { sectionId, courseId } = offeringParams(req);
   const offering = await assertTeachesOffering(currentUser(req), sectionId, courseId);
@@ -42,8 +59,12 @@ attendanceRouter.get("/attendance/:sectionId/:courseId", async (req, res) => {
 
 attendanceRouter.post("/attendance/:sectionId/:courseId", async (req, res) => {
   const { sectionId, courseId } = offeringParams(req);
-  await assertTeachesOffering(currentUser(req), sectionId, courseId);
-  const result = await attendance.saveAttendance(courseId, sectionId, parseInput(attendance.saveAttendanceSchema, req.body));
+  const viewer = currentUser(req);
+  await assertTeachesOffering(viewer, sectionId, courseId);
+  // Admins fix attendance the teacher has taken; they don't take a day themselves.
+  const result = await attendance.saveAttendance(courseId, sectionId, parseInput(attendance.saveAttendanceSchema, req.body), {
+    fixOnly: viewer.role === UserRole.ADMIN,
+  });
   invalidateUniversity();
   done(res, { ...result, message: `Attendance saved for ${result.saved} student(s).` });
 });

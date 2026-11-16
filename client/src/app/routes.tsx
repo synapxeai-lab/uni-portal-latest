@@ -57,6 +57,7 @@ const MyCoursesPage = lazy(() => import("@/pages/university/my-courses-page"));
 const ClassroomOfferingRedirect = lazy(() => import("@/pages/classes/offering-redirect"));
 const TeachingAttendancePage = lazy(() => import("@/pages/teaching/attendance-page"));
 const AttendanceOverviewPage = lazy(() => import("@/pages/university/attendance-overview-page"));
+const EditAttendancePage = lazy(() => import("@/pages/university/edit-attendance-page"));
 const MyAttendancePage = lazy(() => import("@/pages/university/my-attendance-page"));
 const TeachingMarksPage = lazy(() => import("@/pages/teaching/marks-page"));
 const GradesPage = lazy(() => import("@/pages/university/grades-page"));
@@ -147,6 +148,7 @@ export function AppRoutes() {
           <Route path="assign-teachers" element={<AssignTeachersPage />} />
           <Route path="registration" element={<RegistrationsPage />} />
           <Route path="attendance" element={<AttendanceOverviewPage />} />
+          <Route path="attendance/edit" element={<EditAttendancePage />} />
           <Route path="grades" element={<GradesPage />} />
           <Route path="fees" element={<FeesPage />} />
           <Route path="settings" element={<Navigate to="/settings#platform" replace />} />

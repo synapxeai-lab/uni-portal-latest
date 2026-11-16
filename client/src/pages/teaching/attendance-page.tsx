@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router";
 import { CalendarCheck, CalendarPlus, CalendarX2 } from "lucide-react";
 
 import { useGoBack } from "@/components/page/back-button";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QueryView } from "@/app/route-states";
+import { useSession } from "@/lib/auth";
 import { useParams, useRouter, useSearchParams } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { FirstOfferingRedirect, OfferingPicker, PageLoading } from "@/features/academics/components/teaching-picker";
@@ -230,6 +232,12 @@ function OfferingAttendance({ sectionId, courseId }: { sectionId: number; course
 /** Attendance (teachers and admins), from the sidebar. */
 export default function AttendancePage() {
   const params = useParams<{ sectionId?: string; courseId?: string }>();
+  const isAdmin = useSession().data?.user.role === "ADMIN";
+  if (isAdmin) {
+    // Taking attendance is the teacher's job; admins change it on Edit attendance.
+    const course = params.sectionId && params.courseId ? `?section=${params.sectionId}&course=${params.courseId}` : "";
+    return <Navigate to={`/admin/attendance/edit${course}`} replace />;
+  }
   if (!params.sectionId || !params.courseId) {
     return (
       <FirstOfferingRedirect base={BASE} title="Attendance" description="Take daily attendance for the course sections you teach." />

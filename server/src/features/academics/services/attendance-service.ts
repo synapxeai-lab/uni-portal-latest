@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { AuthError, badRequest } from "@/http/errors";
 import { prisma } from "@/lib/prisma";
 
 import { getSelfStudent } from "../lib/self";
@@ -62,8 +63,26 @@ export async function getAttendance(courseId: number, sectionId: number, date: D
   return { date, roster: students, dates: history };
 }
 
-/** Saves a day's marks; records for students not registered here are ignored. */
-export async function saveAttendance(courseId: number, sectionId: number, input: z.infer<typeof saveAttendanceSchema>) {
+/**
+ * Saves a day's marks; records for students not registered here are ignored.
+ * Taking a day's attendance is the teacher's job: with `fixOnly` (admins) only
+ * a day the teacher has already taken can be changed.
+ */
+export async function saveAttendance(
+  courseId: number,
+  sectionId: number,
+  input: z.infer<typeof saveAttendanceSchema>,
+  { fixOnly = false }: { fixOnly?: boolean } = {},
+) {
+  if (fixOnly) {
+    const taken = await prisma.attendance.count({ where: { date: input.date, enrollment: { courseId, sectionId } } });
+    if (taken === 0) {
+      throw new AuthError(
+        "FORBIDDEN",
+        "Attendance for this day hasn't been taken. The course's teacher takes attendance; you can fix days already taken.",
+      );
+    }
+  }
   const valid = new Set(
     (await prisma.enrollment.findMany({ where: { courseId, sectionId }, select: { id: true } })).map((e) => e.id),
   );
@@ -78,6 +97,83 @@ export async function saveAttendance(courseId: number, sectionId: number, input:
     ),
   );
   return { saved: records.length };
+}
+
+// ---- Admin: edit a course's whole register ------------------------------------------------
+
+export const registerChangesSchema = z.object({
+  changes: z
+    .array(z.object({ enrollmentId: z.number().int(), date: dateOnly, status: z.enum(ATTENDANCE_STATUSES) }))
+    .min(1, "Change at least one mark first.")
+    .max(5000, "Too many changes at once."),
+});
+
+/**
+ * One course section's whole register for the Edit attendance page: every
+ * registered student (by roll no) and every day attendance was taken, with
+ * each student's mark per day (null when they weren't marked that day).
+ */
+export async function getRegister(courseId: number, sectionId: number) {
+  const [enrollments, records] = await Promise.all([
+    prisma.enrollment.findMany({
+      where: { courseId, sectionId },
+      select: { id: true, student: { select: { id: true, name: true, rollNo: true } } },
+      orderBy: { student: { rollNo: "asc" } },
+    }),
+    prisma.attendance.findMany({
+      where: { enrollment: { courseId, sectionId } },
+      select: { enrollmentId: true, date: true, status: true },
+    }),
+  ]);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const dates = [...new Set(records.map((r) => iso(r.date)))].sort();
+  const marks = new Map<number, Record<string, Status>>();
+  for (const r of records) {
+    const row = marks.get(r.enrollmentId) ?? {};
+    row[iso(r.date)] = r.status as Status;
+    marks.set(r.enrollmentId, row);
+  }
+  return {
+    dates,
+    students: enrollments.map((e) => ({ enrollmentId: e.id, student: e.student, marks: marks.get(e.id) ?? {} })),
+  };
+}
+
+/**
+ * Saves an admin's changes to a register. Only days the teacher has taken can
+ * be changed (a student unmarked on such a day can be marked); taking a new
+ * day is the teacher's job. Records for students not registered here are refused.
+ */
+export async function saveRegisterChanges(courseId: number, sectionId: number, input: z.infer<typeof registerChangesSchema>) {
+  const [enrollments, taken] = await Promise.all([
+    prisma.enrollment.findMany({ where: { courseId, sectionId }, select: { id: true } }),
+    prisma.attendance.findMany({
+      where: { enrollment: { courseId, sectionId } },
+      distinct: ["date"],
+      select: { date: true },
+    }),
+  ]);
+  const valid = new Set(enrollments.map((e) => e.id));
+  const takenDays = new Set(taken.map((t) => t.date.getTime()));
+  if (input.changes.some((c) => !valid.has(c.enrollmentId))) {
+    throw badRequest("Some of these students aren't registered in this course section.");
+  }
+  if (input.changes.some((c) => !takenDays.has(c.date.getTime()))) {
+    throw new AuthError(
+      "FORBIDDEN",
+      "Only days the teacher has taken can be changed. The course's teacher takes attendance for a new day.",
+    );
+  }
+  await prisma.$transaction(
+    input.changes.map((c) =>
+      prisma.attendance.upsert({
+        where: { enrollmentId_date: { enrollmentId: c.enrollmentId, date: c.date } },
+        update: { status: c.status },
+        create: { enrollmentId: c.enrollmentId, date: c.date, status: c.status },
+      }),
+    ),
+  );
+  return { saved: input.changes.length };
 }
 
 function summarize(records: { status: string }[]) {
@@ -134,7 +230,8 @@ export async function attendanceOverview(params: { category?: string }) {
     where: params.category ? { section: { department: { category: params.category } } } : {},
     include: {
       course: { select: { id: true, code: true, name: true } },
-      section: { select: { id: true, label: true, batch: true, department: { select: { code: true } } } },
+      // Diploma id and name let the Edit attendance page pick diploma -> section -> course.
+      section: { select: { id: true, label: true, batch: true, department: { select: { id: true, code: true, name: true } } } },
       teacher: { select: { name: true } },
       classroom: { select: { id: true } },
     },

@@ -38,6 +38,28 @@ describe("attendance", () => {
     expect(after.data.dates.some((d) => d.date.startsWith(day))).toBe(true);
   });
 
+  it("lets an admin fix a day the teacher took, but not take a new day", async () => {
+    const fresh = await admin.post(path, { date: "2001-01-01", records: [] });
+    expect(fresh.status).toBe(403);
+
+    const taken = await admin.get<AttendancePage>(`${path}?date=2026-10-05`);
+    const records = taken.data.roster.map((r) => ({ enrollmentId: r.enrollmentId, status: "PRESENT" }));
+    expect((await admin.post(path, { date: "2026-10-05", records })).status).toBe(200);
+  });
+
+  it("shows an admin the whole register and saves changes only on days already taken", async () => {
+    const register = await admin.get<{ dates: string[]; students: { enrollmentId: number; marks: Record<string, string> }[] }>(
+      `${path}/register`,
+    );
+    expect(register.data.dates).toContain("2026-10-05");
+    const [first] = register.data.students;
+    const keep = { enrollmentId: first.enrollmentId, date: "2026-10-05", status: first.marks["2026-10-05"] };
+    expect((await admin.put(`${path}/register`, { changes: [keep] })).status).toBe(200);
+    expect((await admin.put(`${path}/register`, { changes: [{ ...keep, date: "2001-01-01" }] })).status).toBe(403);
+    expect((await admin.put(`${path}/register`, { changes: [{ ...keep, enrollmentId: 999999 }] })).status).toBe(400);
+    expect((await teacher.get(`${path}/register`)).status).toBe(403);
+  });
+
   it("refuses a teacher who doesn't teach the section, and bad input", async () => {
     const other = await new Session().login("sana.mirza@eithm.edu.pk", "Teacher@123");
     expect((await other.get(path)).status).toBe(404);
