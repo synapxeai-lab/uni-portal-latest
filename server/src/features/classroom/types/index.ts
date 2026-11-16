@@ -20,7 +20,19 @@ export interface ClassroomSummary {
   role: ClassroomMembershipRole;
   createdAt: Date;
   /** The university course offering this classroom belongs to, if any. */
-  offering: { courseId: number; sectionId: number } | null;
+  offering: ClassroomOffering | null;
+}
+
+/** A classroom's course offering, with what the Classes page filters by. */
+export interface ClassroomOffering {
+  courseId: number;
+  sectionId: number;
+  course: { code: string; name: string };
+  diploma: { id: number; code: string; name: string };
+  /** The diploma's programme category key (TOURISM, AVIATION_AND_TRAVEL...). */
+  programme: string;
+  batch: string;
+  sectionLabel: string;
 }
 
 export interface ClassroomMemberSummary {

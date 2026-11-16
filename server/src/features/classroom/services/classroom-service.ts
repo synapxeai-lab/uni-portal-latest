@@ -33,8 +33,23 @@ const MAX_CODE_ATTEMPTS = 5;
 function classroomWithOwnerInclude() {
   return {
     owner: { select: { name: true } },
-    // Set for the classroom of a university course offering.
-    sectionCourse: { select: { courseId: true, sectionId: true } },
+    // Set for the classroom of a university course offering; its course,
+    // section and diploma let the Classes page filter by programme, diploma,
+    // batch and section.
+    sectionCourse: {
+      select: {
+        courseId: true,
+        sectionId: true,
+        course: { select: { code: true, name: true } },
+        section: {
+          select: {
+            label: true,
+            batch: true,
+            department: { select: { id: true, code: true, name: true, category: true } },
+          },
+        },
+      },
+    },
   } as const;
 }
 
@@ -62,7 +77,21 @@ function toClassroomSummary(
     ownerName: classroom.owner.name,
     role,
     createdAt: classroom.createdAt,
-    offering: classroom.sectionCourse,
+    offering: classroom.sectionCourse
+      ? {
+          courseId: classroom.sectionCourse.courseId,
+          sectionId: classroom.sectionCourse.sectionId,
+          course: classroom.sectionCourse.course,
+          diploma: {
+            id: classroom.sectionCourse.section.department.id,
+            code: classroom.sectionCourse.section.department.code,
+            name: classroom.sectionCourse.section.department.name,
+          },
+          programme: classroom.sectionCourse.section.department.category,
+          batch: classroom.sectionCourse.section.batch,
+          sectionLabel: classroom.sectionCourse.section.label,
+        }
+      : null,
   };
 }
 
