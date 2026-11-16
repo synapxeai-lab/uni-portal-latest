@@ -55,7 +55,7 @@ interface TeacherPay {
 const titleCase = (value: string) => value.charAt(0) + value.slice(1).toLowerCase();
 
 function Challans() {
-  const [status, setStatus] = useState("PENDING_APPROVAL");
+  const [status, setStatus] = useState("");
   const [programme, setProgramme] = useState("");
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 300);
