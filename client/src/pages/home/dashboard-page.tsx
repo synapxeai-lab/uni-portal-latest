@@ -32,7 +32,7 @@ export default function DashboardPage() {
             <PageContainer>
               <WelcomeCard
                 name={name}
-                description="Your course sections, review queue and scheduled content at a glance."
+                description="Your classes and review queue at a glance."
               />
               <UniversitySummary />
               <TeacherDashboardView data={response.data} />

@@ -132,39 +132,9 @@ export function UniversitySummary() {
 
   if (summary.role === "TEACHER") {
     return (
+      // Just the term: teachers open their course sections from the Classes page.
       <DashboardSection title="Teaching this term">
-        <div className="flex flex-col gap-4">
-          <TermBanner {...summary} />
-          {summary.teaching.length === 0 ? (
-            <p className="text-sm text-muted-foreground">You aren't assigned to any course sections yet.</p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {summary.teaching.map((t) => (
-                <Card key={`${t.course.code}-${t.section.batch}-${t.section.label}`} className="flex flex-col gap-3 p-4">
-                  <div className="flex flex-col">
-                    <span className="font-semibold">{t.course.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {t.course.code} · {t.section.department.code} {t.section.batch}-{t.section.label} · {t.students} students
-                    </span>
-                  </div>
-                  {t.classroomId ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/classes/${t.classroomId}/stream`}>Classroom</Link>
-                      </Button>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/attendance/${t.sectionId}/${t.courseId}`}>Attendance</Link>
-                      </Button>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/marks/${t.sectionId}/${t.courseId}`}>Marks</Link>
-                      </Button>
-                    </div>
-                  ) : null}
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+        <TermBanner {...summary} />
       </DashboardSection>
     );
   }
