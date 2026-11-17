@@ -1,5 +1,4 @@
 import type { ClassroomSummary } from "@/features/classroom/types";
-import type { PlatformStats } from "@/features/admin/reports/types";
 import type { ReviewQueueSummary } from "@/features/review/types";
 import type { ScheduledContentStats, UpcomingPublicationItem } from "@/features/scheduling/types";
 
@@ -29,10 +28,3 @@ export interface StudentDashboardData {
   missingAssignmentCount: number;
 }
 
-export interface AdminDashboardData {
-  platformStats: PlatformStats;
-  archivedClassroomCount: number;
-  scheduledContent: ScheduledContentStats;
-  reviewSummary: ReviewQueueSummary;
-  upcomingPublications: UpcomingPublicationItem[];
-}

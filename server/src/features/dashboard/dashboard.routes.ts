@@ -23,17 +23,14 @@ export const dashboardRouter = Router();
 
 const aggregateTags = [CacheTags.ACADEMIC, CacheTags.AGGREGATES];
 
-/** Home: the platform-wide view for admins, the teaching view for teachers, the student view otherwise. */
+/** Home: the teaching view for teachers, the student view for students (admins get the University summary). */
 dashboardRouter.get("/dashboard", async (req, res) => {
   const user = currentUser(req);
 
+  // Admins' Home is the University summary (its own endpoints); submissions and
+  // reviews are the teachers' business, so there's no admin data to build here.
   if (user.role === UserRole.ADMIN) {
-    const data = await cached(
-      "dashboard:admin",
-      { ttl: CacheTtl.LIVE, tags: [...aggregateTags, CacheTags.ADMIN] },
-      () => dashboardService.getAdminDashboard(),
-    );
-    res.json({ role: user.role, data });
+    res.json({ role: user.role });
     return;
   }
 

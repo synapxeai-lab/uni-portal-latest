@@ -1,6 +1,5 @@
 import { PageContainer } from "@/components/page/page-container";
 import { useDashboard } from "@/features/dashboard/api";
-import { AdminDashboardView } from "@/features/dashboard/components/admin-dashboard-view";
 import { StudentDashboardView } from "@/features/dashboard/components/student-dashboard-view";
 import { TeacherDashboardView } from "@/features/dashboard/components/teacher-dashboard-view";
 import { WelcomeCard } from "@/features/dashboard/components/welcome-card";
@@ -9,7 +8,7 @@ import { AppLoading } from "@/app/layouts";
 import { QueryView } from "@/app/route-states";
 import { useSession } from "@/lib/auth";
 
-/** Home is the only dashboard for every role - admins get the platform-wide view here. */
+/** Home is the only dashboard for every role - admins get the University summary here. */
 export default function DashboardPage() {
   const name = useSession().data?.user.name;
   const dashboard = useDashboard();
@@ -22,10 +21,9 @@ export default function DashboardPage() {
             <PageContainer>
               <WelcomeCard
                 name={name}
-                description="The whole institute at a glance: academic records, fees, classrooms and platform activity."
+                description="The whole institute at a glance: academic records, teachers, students and fees."
               />
               <UniversitySummary />
-              <AdminDashboardView data={response.data} />
             </PageContainer>
           );
         }

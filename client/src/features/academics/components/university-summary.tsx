@@ -110,7 +110,7 @@ export function UniversitySummary() {
             <StatCard
               compact
               tone={counts.unassigned ? "warning" : "success"}
-              label="Without a teacher"
+              label="Teachers to be assigned"
               value={counts.unassigned}
               icon={UserRoundX}
               href="/admin/assign-teachers"
@@ -118,7 +118,7 @@ export function UniversitySummary() {
             <StatCard
               compact
               tone={fees.pendingApprovals ? "warning" : "success"}
-              label="Payments to approve"
+              label="Awaiting approval payments"
               value={fees.pendingApprovals}
               icon={Receipt}
               hint={`${formatRs(fees.unpaidAmount)} unpaid`}

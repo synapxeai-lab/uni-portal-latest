@@ -61,7 +61,7 @@ async function warmUpAs(user: SessionUser): Promise<void> {
     ignore(timetableService.listWeeklyTimetable(user)),
     ignore(searchService.search(user, { query: "warm up" })),
     user.role === UserRole.ADMIN
-      ? ignore(dashboardService.getAdminDashboard())
+      ? Promise.resolve()
       : user.role === UserRole.TEACHER
         ? ignore(dashboardService.getTeacherDashboard(user))
         : ignore(dashboardService.getStudentDashboard(user)),

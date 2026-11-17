@@ -1,5 +1,4 @@
 import type { SessionUser } from "@/auth/session";
-import { getPlatformStats } from "@/features/admin/reports/services/analytics-service";
 import {
   countArchivedClassrooms,
   listActiveClassroomIds,
@@ -15,10 +14,8 @@ import {
   getUpcomingPublications,
 } from "@/features/scheduling/services/scheduled-content-stats-service";
 import { countStudentMissingAssignments } from "@/features/todo/services/todo-service";
-import { prisma } from "@/lib/prisma";
-import { ClassroomStatus } from "@/generated/prisma/enums";
 
-import type { AdminDashboardData, StudentDashboardData, TeacherDashboardData } from "../types";
+import type { StudentDashboardData, TeacherDashboardData } from "../types";
 
 /**
  * Every tile is computed from the same manageable-classroom-id list, fetched
@@ -61,39 +58,5 @@ export async function getStudentDashboard(user: SessionUser): Promise<StudentDas
     archivedClassrooms,
     upcomingDeadlines,
     missingAssignmentCount,
-  };
-}
-
-/**
- * Platform-wide stats plus the teacher-style review queue and upcoming
- * publications across every active classroom. The classroom-id lookup runs
- * alongside the platform queries rather than ahead of them, so only the two
- * id-scoped queries wait on it.
- */
-export async function getAdminDashboard(): Promise<AdminDashboardData> {
-  const activeClassroomIds = prisma.classroom
-    .findMany({ where: { status: ClassroomStatus.ACTIVE }, select: { id: true } })
-    .then((classrooms) => classrooms.map((classroom) => classroom.id));
-
-  const [
-    platformStats,
-    archivedClassroomCount,
-    scheduledContent,
-    [reviewSummary, upcomingPublications],
-  ] = await Promise.all([
-    getPlatformStats(),
-    prisma.classroom.count({ where: { status: ClassroomStatus.ARCHIVED } }),
-    getScheduledContentStats(),
-    activeClassroomIds.then((ids) =>
-      Promise.all([getReviewSummary(ids), getUpcomingPublications(ids)] as const),
-    ),
-  ]);
-
-  return {
-    platformStats,
-    archivedClassroomCount,
-    scheduledContent,
-    reviewSummary,
-    upcomingPublications,
   };
 }
