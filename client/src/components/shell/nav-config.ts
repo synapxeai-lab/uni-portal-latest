@@ -26,7 +26,6 @@ import {
   UserRoundCheck,
   ScrollText,
   Settings,
-  ShieldCheck,
   Users,
 } from "lucide-react";
 
@@ -152,12 +151,6 @@ export const navSections: NavSection[] = [
     items: [
       // No separate "Admin Dashboard" entry: "Dashboard" (/dashboard) already
       // shows admins the platform-wide dashboard, and /admin redirects there.
-      {
-        label: "Classrooms",
-        href: "/admin/classrooms",
-        icon: ShieldCheck,
-        roles: [UserRole.ADMIN],
-      },
       {
         label: "Timetable clashes",
         href: "/admin/timetable",

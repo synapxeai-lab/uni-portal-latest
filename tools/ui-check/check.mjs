@@ -44,7 +44,6 @@ const DEFAULT_PAGES = {
     ...COMMON_PAGES,
     "/review",
     "/admin/users",
-    "/admin/classrooms",
     "/admin/audit-logs",
     "/admin/timetable",
     "/admin/programmes",

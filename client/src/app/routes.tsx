@@ -23,7 +23,6 @@ const SearchPage = lazy(() => import("@/pages/account/search-page"));
 const ProfilePage = lazy(() => import("@/pages/account/profile-page"));
 const SettingsPage = lazy(() => import("@/pages/account/settings-page"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users-page"));
-const AdminClassroomsPage = lazy(() => import("@/pages/admin/classrooms-page"));
 const AdminAuditLogsPage = lazy(() => import("@/pages/admin/audit-logs-page"));
 const ClassesPage = lazy(() => import("@/pages/classes/classes-page"));
 const ArchivedClassesPage = lazy(() => import("@/pages/classes/archived-page"));
@@ -126,7 +125,6 @@ export function AppRoutes() {
           {/* The admin dashboard was merged into Home, which shows admins the platform-wide view. */}
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="users" element={<AdminUsersPage />} />
-          <Route path="classrooms" element={<AdminClassroomsPage />} />
           <Route path="timetable" element={<AdminTimetablePage />} />
           <Route path="audit-logs" element={<AdminAuditLogsPage />} />
           <Route path="programmes" element={<ProgrammesPage />} />
