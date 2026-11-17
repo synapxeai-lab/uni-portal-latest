@@ -16,6 +16,9 @@ await build({
     index: "src/index.ts",
     "create-admin": "scripts/create-admin.ts",
     seed: "prisma/seed.ts",
+    // backfill-viewable-passwords: re-encrypts admin-viewable password copies with this
+    // server's key after a database copy (see docs/deploy-dokploy.md).
+    "backfill-viewable-passwords": "scripts/backfill-viewable-passwords.ts",
   },
   outdir: "dist",
   bundle: true,
@@ -30,4 +33,4 @@ await build({
   },
 });
 
-console.log("server built -> dist/index.js, dist/create-admin.js, dist/seed.js");
+console.log("server built -> dist/index.js, dist/create-admin.js, dist/seed.js, dist/backfill-viewable-passwords.js");

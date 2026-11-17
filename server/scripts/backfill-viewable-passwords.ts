@@ -12,6 +12,7 @@
  * Nobody's password or sign-in changes.
  *
  *   npx tsx scripts/backfill-viewable-passwords.ts ["<known password>" ...]
+ *   (production image, no tsx: node dist/backfill-viewable-passwords.js ...)
  */
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/password";
