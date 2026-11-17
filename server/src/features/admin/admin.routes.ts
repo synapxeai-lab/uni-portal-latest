@@ -122,8 +122,9 @@ adminRouter.post("/users/:userId/reset-password", async (req, res) => {
 });
 
 adminRouter.get("/users/:userId/password", async (req, res) => {
-  // Never cached: it is read on demand, one user at a time.
-  res.json({ status: "success", data: await userService.viewPassword(userIdOf(req)) });
+  // Never cached: it is read on demand, one user at a time. A read, so the payload is
+  // returned as-is ({ password }) like every other GET - the Users page reads it that way.
+  res.set("Cache-Control", "no-store").json(await userService.viewPassword(userIdOf(req)));
 });
 
 adminRouter.post("/users/:userId/force-password-change", async (req, res) => {
