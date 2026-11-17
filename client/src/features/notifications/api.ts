@@ -61,6 +61,16 @@ export function markAllNotificationsReadAction() {
   );
 }
 
+/** Clear all: deletes every one of the user's notifications, read or not. */
+export function deleteAllNotificationsAction() {
+  return apiAction<{ deleted: number }>(
+    "delete",
+    "/notifications",
+    undefined,
+    "Couldn't clear your notifications. Please try again.",
+  );
+}
+
 export function deleteNotificationAction(notificationId: string) {
   return apiAction(
     "delete",

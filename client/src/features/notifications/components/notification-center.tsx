@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Bell, Check } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Bell, Check, Trash2 } from "lucide-react";
 
 import { EmptyState } from "@/components/states/empty-state";
 import { ErrorState } from "@/components/states/error-state";
@@ -17,6 +17,7 @@ import {
 import { groupNotificationsByDate } from "../lib/group-by-date";
 import { NOTIFICATION_TYPE_LABEL } from "../lib/format";
 import type { NotificationSummary } from "../types";
+import { ClearAllNotificationsDialog } from "./clear-all-dialog";
 import { NotificationItem } from "./notification-item";
 
 interface NotificationCenterProps {
@@ -63,6 +64,7 @@ export function NotificationCenter({
     markRead,
     markAllRead,
     remove,
+    clearAll,
     retry,
   } = useNotificationCenter({ initialNotifications, initialCursor });
 
@@ -72,6 +74,7 @@ export function NotificationCenter({
   );
   const groups = useMemo(() => groupNotificationsByDate(notifications), [notifications]);
   const hasActiveFilter = typeFilter !== "ALL" || unreadOnly;
+  const [confirmClear, setConfirmClear] = useState(false);
 
   return (
     <div className="flex flex-col gap-5">
@@ -116,12 +119,26 @@ export function NotificationCenter({
           </Select>
         </div>
 
-        {unreadCount > 0 ? (
-          <Button type="button" variant="ghost" size="sm" onClick={() => markAllRead()}>
-            <Check className="h-4 w-4" aria-hidden /> Mark all as read
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {unreadCount > 0 ? (
+            <Button type="button" variant="ghost" size="sm" onClick={() => markAllRead()}>
+              <Check className="h-4 w-4" aria-hidden /> Mark all as read
+            </Button>
+          ) : null}
+          {notifications.length > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setConfirmClear(true)}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden /> Clear all
+            </Button>
+          ) : null}
+        </div>
       </div>
+      <ClearAllNotificationsDialog open={confirmClear} onOpenChange={setConfirmClear} onConfirm={clearAll} />
 
       <div aria-live="polite" aria-busy={isLoading} className="flex flex-col gap-5">
         {isLoading ? (

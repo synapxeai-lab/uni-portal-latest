@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
 import {
+  deleteAllNotificationsAction,
   deleteNotificationAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
@@ -16,6 +17,8 @@ interface UseNotificationMutationsOptions {
    * Omit when the caller derives its unread count directly from
    * `notifications` instead of tracking a separate counter. */
   onUnreadDelta?: (delta: number) => void;
+  /** Called after Clear all succeeds - reset pagination and the unread count. */
+  onCleared?: () => void;
 }
 
 /**
@@ -29,6 +32,7 @@ export function useNotificationMutations({
   notifications,
   setNotifications,
   onUnreadDelta,
+  onCleared,
 }: UseNotificationMutationsOptions) {
   const markRead = useCallback(
     async (notificationId: string) => {
@@ -115,5 +119,20 @@ export function useNotificationMutations({
     [notifications, setNotifications, onUnreadDelta],
   );
 
-  return { markRead, markAllRead, remove };
+  // Not optimistic: it also removes pages that aren't loaded and can't be undone,
+  // so the list only empties once the server confirms (the dialog shows progress).
+  const clearAll = useCallback(async (): Promise<boolean> => {
+    const result = await deleteAllNotificationsAction();
+
+    if (result.status !== "success") {
+      toast.error(result.message);
+      return false;
+    }
+
+    setNotifications([]);
+    onCleared?.();
+    return true;
+  }, [setNotifications, onCleared]);
+
+  return { markRead, markAllRead, remove, clearAll };
 }

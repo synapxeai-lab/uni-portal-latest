@@ -115,6 +115,16 @@ export async function markStreamNotificationsRead(
   return result.count;
 }
 
+/** Clears (soft-deletes) every one of the user's notifications, read or not. Returns how many. */
+export async function deleteAllNotifications(userId: string): Promise<number> {
+  const result = await prisma.notification.updateMany({
+    where: { recipientId: userId, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+
+  return result.count;
+}
+
 export async function deleteNotification(notificationId: string, userId: string): Promise<void> {
   const result = await prisma.notification.updateMany({
     where: { id: notificationId, recipientId: userId, deletedAt: null },

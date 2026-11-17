@@ -66,13 +66,22 @@ export function useNotifications({ initialUnreadCount }: UseNotificationsOptions
     setIsLoadingMore(false);
   }, [nextCursor, isLoadingMore]);
 
-  const { markRead, markAllRead, remove } = useNotificationMutations({
+  const { markRead, markAllRead, remove, clearAll } = useNotificationMutations({
     notifications,
     setNotifications,
     onUnreadDelta: (delta) =>
       shared
         ? shared.adjust(delta)
         : setLocalUnreadCount((previous) => Math.max(0, previous + delta)),
+    onCleared: () => {
+      setNextCursor(null);
+      // Everything is gone, including unread ones on pages never loaded - the badge goes to 0.
+      if (shared) {
+        shared.adjust(-shared.count);
+      } else {
+        setLocalUnreadCount(0);
+      }
+    },
   });
 
   return {
@@ -88,5 +97,6 @@ export function useNotifications({ initialUnreadCount }: UseNotificationsOptions
     markRead,
     markAllRead,
     remove,
+    clearAll,
   };
 }

@@ -95,9 +95,10 @@ export function useNotificationCenter({
     setIsLoadingMore(false);
   }, [nextCursor, isLoadingMore, unreadOnly, typeFilter]);
 
-  const { markRead, markAllRead, remove } = useNotificationMutations({
+  const { markRead, markAllRead, remove, clearAll } = useNotificationMutations({
     notifications,
     setNotifications,
+    onCleared: () => setNextCursor(null),
   });
 
   return {
@@ -114,6 +115,7 @@ export function useNotificationCenter({
     markRead,
     markAllRead,
     remove,
+    clearAll,
     retry: () => reload(typeFilter, unreadOnly),
   };
 }

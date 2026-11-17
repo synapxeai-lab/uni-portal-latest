@@ -61,6 +61,12 @@ notificationRouter.post("/read-all", async (req, res) => {
   res.json({ status: "success", data: { updated } });
 });
 
+/** Clear all: removes every one of the caller's notifications (only their own). */
+notificationRouter.delete("/", async (req, res) => {
+  const deleted = await notificationService.deleteAllNotifications(currentUser(req).id);
+  res.json({ status: "success", data: { deleted } });
+});
+
 notificationRouter.post("/:notificationId/read", async (req, res) => {
   await notificationService.markNotificationRead(notificationIdOf(req), currentUser(req).id);
   res.json({ status: "success", data: undefined });
