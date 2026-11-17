@@ -67,7 +67,9 @@ async function warmUpAs(user: SessionUser): Promise<void> {
         : ignore(dashboardService.getStudentDashboard(user)),
     user.role === UserRole.STUDENT
       ? ignore(todoService.getStudentTodoItems(user, {}))
-      : ignore(reviewService.getTeacherReviewQueue(user, parseReviewFilters({}))),
+      : user.role === UserRole.TEACHER
+        ? ignore(reviewService.getTeacherReviewQueue(user, parseReviewFilters({})))
+        : Promise.resolve(),
   ]);
 
   const classroom = classrooms[0];

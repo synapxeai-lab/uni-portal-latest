@@ -71,7 +71,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     "/classrooms/archived",
     "/dashboard",
     "/notifications?limit=20",
-    ...(role === "student" ? ["/todo"] : ["/review"]),
+    ...(role === "student" ? ["/todo"] : role === "teacher" ? ["/review"] : []),
     "/timetable",
     "/search?q=destination",
     "/account/profile",

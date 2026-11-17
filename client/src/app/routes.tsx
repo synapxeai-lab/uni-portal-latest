@@ -88,8 +88,11 @@ export function AppRoutes() {
             <Route path="/transcript" element={<TranscriptPage />} />
             <Route path="/fee-challan" element={<MyChallansPage />} />
           </Route>
-          <Route element={<RoleRoute roles={[UserRole.TEACHER, UserRole.ADMIN]} denied="review" />}>
+          {/* Grading submissions is the teachers' job, so the review queue is theirs alone. */}
+          <Route element={<RoleRoute roles={[UserRole.TEACHER]} denied="review" />}>
             <Route path="/review" element={<ReviewPage />} />
+          </Route>
+          <Route element={<RoleRoute roles={[UserRole.TEACHER, UserRole.ADMIN]} denied="review" />}>
             <Route path="/grades" element={<GradesPage />} />
             <Route path="/marks" element={<TeachingMarksPage />} />
             <Route path="/marks/:sectionId/:courseId" element={<TeachingMarksPage />} />

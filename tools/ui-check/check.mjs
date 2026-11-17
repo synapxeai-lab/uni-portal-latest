@@ -42,7 +42,6 @@ const COMMON_PAGES = [
 const DEFAULT_PAGES = {
   admin: [
     ...COMMON_PAGES,
-    "/review",
     "/admin/users",
     "/admin/audit-logs",
     "/admin/timetable",

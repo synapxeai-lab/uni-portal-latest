@@ -76,7 +76,8 @@ export const navSections: NavSection[] = [
         label: "To review",
         href: "/review",
         icon: ClipboardList,
-        roles: [UserRole.TEACHER, UserRole.ADMIN],
+        // Grading submissions is the teachers' job, not the admins'.
+        roles: [UserRole.TEACHER],
       },
       { label: "Marks", href: "/marks", icon: BookCheck, roles: [UserRole.TEACHER] },
       { label: "Attendance", href: "/attendance", icon: CalendarCheck, roles: [UserRole.TEACHER] },

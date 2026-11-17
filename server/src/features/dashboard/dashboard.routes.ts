@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-import { currentUser, requireTeacherOrAdmin } from "@/middleware/auth";
+import { currentUser, requireRole } from "@/middleware/auth";
 import { cached } from "@/lib/cache/tagged-cache";
 import { CacheTags, CacheTtl } from "@/lib/cache/tags";
 import { UserRole } from "@/generated/prisma/enums";
@@ -79,7 +79,7 @@ dashboardRouter.get("/todo", async (req, res) => {
 });
 
 /** Teacher review queue - filters, sort and page come from the query string. */
-dashboardRouter.get("/review", requireTeacherOrAdmin, async (req, res) => {
+dashboardRouter.get("/review", requireRole(UserRole.TEACHER), async (req, res) => {
   const user = currentUser(req);
   const filters = parseReviewFilters(req.query as RawSearchParams);
   const result = await cached(
