@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { apiAction, apiGet, getApiError } from "@/lib/api";
+import { apiAction as rawApiAction, apiGet, getApiError } from "@/lib/api";
+import { queryClient } from "@/lib/query-client";
 
 import type {
   ActionResult,
@@ -10,6 +11,22 @@ import type {
   TimetableClashView,
   TimetableSlotView,
 } from "./types";
+
+/**
+ * Every timetable change (schedule, move, cancel, resolve or dismiss a clash)
+ * refreshes the timetable and clash lists on success, so pages on screen
+ * update without a reload - e.g. the last resolved clash leaves "No clashes".
+ */
+async function apiAction<T = undefined>(...args: Parameters<typeof rawApiAction>): Promise<ActionResult<T>> {
+  const result = await rawApiAction<T>(...args);
+  if (result.status === "success") {
+    void queryClient.invalidateQueries({ queryKey: ["timetable"] });
+    // Class slots also show on the calendar and dashboard; off-screen ones just refetch on next visit.
+    void queryClient.invalidateQueries({ queryKey: ["calendar"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+  return result;
+}
 
 // ---- Queries ------------------------------------------------------------------
 
