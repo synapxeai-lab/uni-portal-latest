@@ -13,11 +13,24 @@ import { env } from "@/config/env";
  */
 const ALGORITHM = "aes-256-gcm";
 
+const derive = (secret: string) => crypto.createHash("sha256").update(secret).digest();
+
+/** The key new copies are encrypted with. */
 function key(): Buffer {
-  return crypto
-    .createHash("sha256")
-    .update(env.PASSWORD_ENC_KEY ?? env.JWT_SECRET)
-    .digest();
+  return derive(env.PASSWORD_ENC_KEY ?? env.JWT_SECRET);
+}
+
+/**
+ * Keys a stored copy may have been encrypted with: the current one, then
+ * PASSWORD_ENC_OLD_KEYS (comma-separated) - e.g. the key of the server a
+ * database was copied from, so its users' passwords stay viewable here.
+ */
+function decryptionKeys(): Buffer[] {
+  const old = (env.PASSWORD_ENC_OLD_KEYS ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  return [key(), ...old.map(derive)];
 }
 
 /** "iv.tag.ciphertext", each base64 - the same format the University Portal stored. */
@@ -28,17 +41,29 @@ export function encryptPassword(plain: string): string {
   return [iv, cipher.getAuthTag(), data].map((part) => part.toString("base64")).join(".");
 }
 
-/** null when the value is missing or can't be decrypted with the current key. */
+/** null when the value is missing or can't be decrypted with any known key. */
 export function decryptPassword(stored: string | null | undefined): string | null {
+  return decryptPasswordWithKeyInfo(stored)?.password ?? null;
+}
+
+/** Like decryptPassword, plus whether it took an old key (so the copy should be re-encrypted). */
+export function decryptPasswordWithKeyInfo(
+  stored: string | null | undefined,
+): { password: string; oldKey: boolean } | null {
   if (!stored) {
     return null;
   }
-  try {
-    const [iv, tag, data] = stored.split(".").map((part) => Buffer.from(part, "base64"));
-    const decipher = crypto.createDecipheriv(ALGORITHM, key(), iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
-  } catch {
-    return null;
+  const keys = decryptionKeys();
+  for (const [index, candidate] of keys.entries()) {
+    try {
+      const [iv, tag, data] = stored.split(".").map((part) => Buffer.from(part, "base64"));
+      const decipher = crypto.createDecipheriv(ALGORITHM, candidate, iv);
+      decipher.setAuthTag(tag);
+      const password = Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+      return { password, oldKey: index > 0 };
+    } catch {
+      // Wrong key (the auth tag doesn't match) - try the next one.
+    }
   }
+  return null;
 }

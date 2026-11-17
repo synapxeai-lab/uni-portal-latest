@@ -77,7 +77,9 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
         if (password) {
           setCurrentPassword(password);
         } else {
-          toast.error("This password was set before passwords became viewable. Reset it to get a viewable one.");
+          toast.error(
+            "This password can't be shown: it was saved before passwords became viewable, or with another server's key. Reset it to get a viewable one.",
+          );
         }
       } catch {
         toast.error("Couldn't load this user's password. Please try again.");

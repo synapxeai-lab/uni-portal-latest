@@ -12,6 +12,9 @@ const envSchema = z.object({
   // Falls back to JWT_SECRET. Use the University Portal's old key to keep its
   // migrated passwords viewable.
   PASSWORD_ENC_KEY: z.string().min(1).optional(),
+  // Comma-separated keys older copies may be encrypted with (e.g. the server a database
+  // was copied from). Only used to read them; new copies always use the current key.
+  PASSWORD_ENC_OLD_KEYS: z.string().optional(),
   // Selects the StorageProvider implementation (see src/lib/storage).
   STORAGE_DRIVER: z.enum(["local"]).default("local"),
   // Absolute path for the "local" driver's files. Unset = <server>/storage/uploads.

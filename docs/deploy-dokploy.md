@@ -110,6 +110,13 @@ Keep `JWT_SECRET` in a password manager. **Don't change it later:**
 - Changing `JWT_SECRET` signs everyone out.
 - Changing `PASSWORD_ENC_KEY` (or `JWT_SECRET`, if you never set `PASSWORD_ENC_KEY`) makes the admin-viewable passwords unreadable.
 
+**Copied a database from another server (e.g. your local one)?** Its password copies were encrypted with that server's key, so "View password" fails here until you:
+
+1. Set `PASSWORD_ENC_OLD_KEYS` to that server's key - its `PASSWORD_ENC_KEY`, or its `JWT_SECRET` if it had none (comma-separate several). Redeploy. The passwords are now viewable.
+2. Optionally, in the `portal` container's terminal run `npx tsx scripts/backfill-viewable-passwords.ts` to re-encrypt them with this server's key, then remove `PASSWORD_ENC_OLD_KEYS`.
+
+Accounts still listed as not viewable were set before passwords became viewable; reset those from the Users page (or pass their known passwords to the script).
+
 If the database password contains any of `@ / : # ? %`, URL-encode it in `DATABASE_URL` (for example `@` becomes `%40`). A hex password avoids this.
 
 ## 9. Domain and HTTPS
