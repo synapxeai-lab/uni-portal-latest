@@ -23,12 +23,19 @@ import { RoomOccupancy, applyRoomToAvailability } from "./room-occupancy";
 import { SlotPicker } from "./slot-picker";
 import { useSlotAvailability } from "./use-slot-availability";
 
+/** A free cell clicked on the shared timetable: its day, hour and room. */
+export interface SlotPrefill {
+  dayOfWeek: number;
+  startHour: number;
+  room: string;
+}
+
 type ScheduleSlotDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** Registered room numbers. */
   rooms: string[];
 } & (
-  | { mode: "create"; classrooms: TimetableClassroomOption[] }
+  | { mode: "create"; classrooms: TimetableClassroomOption[]; prefill?: SlotPrefill }
   | { mode: "reschedule"; slot: TimetableSlotView }
 );
 
@@ -40,14 +47,15 @@ export function ScheduleSlotDialog(props: ScheduleSlotDialogProps) {
   const [classroomId, setClassroomId] = useState(
     props.mode === "create" ? (props.classrooms[0]?.id ?? "") : props.slot.classroomId,
   );
+  const prefill = props.mode === "create" ? props.prefill : undefined;
   const [dayOfWeek, setDayOfWeek] = useState<number | null>(
-    props.mode === "reschedule" ? props.slot.dayOfWeek : null,
+    props.mode === "reschedule" ? props.slot.dayOfWeek : (prefill?.dayOfWeek ?? null),
   );
-  const [room, setRoom] = useState(props.mode === "reschedule" ? props.slot.room : "");
+  const [room, setRoom] = useState(props.mode === "reschedule" ? props.slot.room : (prefill?.room ?? ""));
   // Rescheduling starts on the class's current hour, so the room list for that
   // hour is visible straight away instead of only after picking a new slot.
   const [hour, setHour] = useState<number | null>(
-    props.mode === "reschedule" ? props.slot.startHour : null,
+    props.mode === "reschedule" ? props.slot.startHour : (prefill?.startHour ?? null),
   );
   const [isPending, startTransition] = useTransition();
 

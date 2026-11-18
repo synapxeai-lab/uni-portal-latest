@@ -16,6 +16,8 @@ export interface TimetableSlotView {
   startHour: number;
   /** Whether the viewer may reschedule/cancel this slot. */
   canManage: boolean;
+  /** The viewer's own class: one they teach, or (for a student) one they're in. Highlighted on the shared timetable. */
+  isMine: boolean;
   /** A move request for this booking that is waiting for the admin, if any. */
   pendingMove: { dayOfWeek: number; startHour: number; room: string } | null;
 }

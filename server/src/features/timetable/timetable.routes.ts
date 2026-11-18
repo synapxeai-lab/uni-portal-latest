@@ -61,7 +61,8 @@ timetableRouter.get("/", async (req, res) => {
           timetableService.listSchedulableClassrooms(user),
         )
       : Promise.resolve([]),
-    isTeacher || user.role === UserRole.ADMIN ? getActiveRooms() : Promise.resolve([]),
+    // Every role: the shared timetable has a row per room.
+    getActiveRooms(),
   ]);
 
   res.json({ slots, schedulableClassrooms, rooms });

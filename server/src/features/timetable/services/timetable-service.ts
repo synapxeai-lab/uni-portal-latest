@@ -131,6 +131,7 @@ function toSlotView(
   slot: SlotWithDetails,
   canManage: boolean,
   pendingMove: TimetableSlotView["pendingMove"] = null,
+  isMine: boolean = canManage,
 ): TimetableSlotView {
   return {
     id: slot.id,
@@ -145,6 +146,7 @@ function toSlotView(
     startHour: slot.startHour,
     canManage,
     pendingMove,
+    isMine,
   };
 }
 
@@ -713,22 +715,27 @@ export async function listSchedulableClassrooms(
  *  - student: every class they're an active member of (view only)
  *  - admin: every class on the timetable
  */
+/**
+ * The one shared institute timetable: every role sees every class on it, so
+ * teachers can see which rooms and hours are taken before booking. Each slot
+ * says whether it's the viewer's own (taught by them, or a class a student is
+ * in) and whether they may change it (its teacher, or an admin).
+ */
 export async function listWeeklyTimetable(user: SessionUser): Promise<TimetableSlotView[]> {
-  let viewerFilter: Prisma.TimetableSlotWhereInput;
-  if (user.role === UserRole.ADMIN) {
-    viewerFilter = {};
-  } else if (user.role === UserRole.TEACHER) {
-    viewerFilter = { teacherId: user.id };
-  } else {
-    const memberships = await prisma.classroomMembership.findMany({
-      where: { userId: user.id, status: ClassroomMembershipStatus.ACTIVE },
-      select: { classroomId: true },
-    });
-    viewerFilter = { classroomId: { in: memberships.map((m) => m.classroomId) } };
-  }
+  const myClassrooms =
+    user.role === UserRole.STUDENT
+      ? new Set(
+          (
+            await prisma.classroomMembership.findMany({
+              where: { userId: user.id, status: ClassroomMembershipStatus.ACTIVE },
+              select: { classroomId: true },
+            })
+          ).map((m) => m.classroomId),
+        )
+      : null;
 
   const slots = await prisma.timetableSlot.findMany({
-    where: { ...viewerFilter, classroom: { status: ClassroomStatus.ACTIVE } },
+    where: { classroom: { status: ClassroomStatus.ACTIVE } },
     include: {
       ...slotWithDetailsInclude,
       moveRequests: {
@@ -743,6 +750,7 @@ export async function listWeeklyTimetable(user: SessionUser): Promise<TimetableS
 
   return slots.map((slot) => {
     const canManage = user.role === UserRole.ADMIN || slot.teacherId === user.id;
+    const isMine = myClassrooms ? myClassrooms.has(slot.classroomId) : slot.teacherId === user.id;
     const move = slot.moveRequests[0];
     return toSlotView(
       slot,
@@ -750,6 +758,7 @@ export async function listWeeklyTimetable(user: SessionUser): Promise<TimetableS
       canManage && move
         ? { dayOfWeek: move.dayOfWeek, startHour: move.startHour, room: move.room }
         : null,
+      isMine,
     );
   });
 }

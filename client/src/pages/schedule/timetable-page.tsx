@@ -18,13 +18,13 @@ export default function TimetablePage() {
       {({ slots, schedulableClassrooms, rooms }) => (
         <PageContainer>
           <SectionHeader
-            title={role === UserRole.ADMIN ? "Timetable" : "My timetable"}
+            title="Timetable"
             description={
               isTeacher
-                ? "Your weekly timetable - it repeats every week. Add a class once (day, time and room) and change it whenever you need; students are notified automatically."
+                ? "The institute's weekly timetable: every class, by room and hour. It repeats every week. Your classes are outlined; click a free cell to book that room, and students are notified automatically."
                 : role === UserRole.ADMIN
-                  ? "Every class on the weekly timetable."
-                  : "Your weekly timetable - the same every week."
+                  ? "The institute's weekly timetable: every class, by room and hour."
+                  : "The institute's weekly timetable, by room and hour. Your classes are outlined."
             }
           />
 
@@ -32,9 +32,9 @@ export default function TimetablePage() {
             slots={slots}
             schedulableClassrooms={schedulableClassrooms}
             canSchedule={isTeacher}
-            showTeacher={!isTeacher}
             rooms={rooms}
             today={todayDayOfWeek()}
+            hasOwnClasses={role !== UserRole.ADMIN}
           />
         </PageContainer>
       )}
