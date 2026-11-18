@@ -14,6 +14,7 @@ import {
   CalendarPlus,
   CalendarRange,
   CalendarX,
+  DoorOpen,
   ClipboardCheck,
   ClipboardList,
   GraduationCap,
@@ -152,6 +153,12 @@ export const navSections: NavSection[] = [
     items: [
       // No separate "Admin Dashboard" entry: "Dashboard" (/dashboard) already
       // shows admins the platform-wide dashboard, and /admin redirects there.
+      {
+        label: "Rooms",
+        href: "/admin/rooms",
+        icon: DoorOpen,
+        roles: [UserRole.ADMIN],
+      },
       {
         label: "Timetable clashes",
         href: "/admin/timetable",

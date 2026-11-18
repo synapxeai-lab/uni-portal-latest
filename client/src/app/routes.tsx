@@ -19,6 +19,7 @@ const ReviewPage = lazy(() => import("@/pages/home/review-page"));
 const CalendarPage = lazy(() => import("@/pages/schedule/calendar-page"));
 const TimetablePage = lazy(() => import("@/pages/schedule/timetable-page"));
 const AdminTimetablePage = lazy(() => import("@/pages/admin/timetable-clashes-page"));
+const AdminRoomsPage = lazy(() => import("@/pages/admin/rooms-page"));
 const SearchPage = lazy(() => import("@/pages/account/search-page"));
 const ProfilePage = lazy(() => import("@/pages/account/profile-page"));
 const SettingsPage = lazy(() => import("@/pages/account/settings-page"));
@@ -129,6 +130,7 @@ export function AppRoutes() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="timetable" element={<AdminTimetablePage />} />
+          <Route path="rooms" element={<AdminRoomsPage />} />
           <Route path="audit-logs" element={<AdminAuditLogsPage />} />
           <Route path="programmes" element={<ProgrammesPage />} />
           <Route path="programmes/:slug" element={<ProgrammePage />} />

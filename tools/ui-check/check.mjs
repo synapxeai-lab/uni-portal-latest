@@ -45,6 +45,7 @@ const DEFAULT_PAGES = {
     "/admin/users",
     "/admin/audit-logs",
     "/admin/timetable",
+    "/admin/rooms",
     "/admin/programmes",
     "/admin/programmes/{programmeSlug}",
     "/admin/diplomas/{departmentId}",

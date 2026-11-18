@@ -76,7 +76,7 @@ function endpointsFor(role: Role, ctx: Context): string[] {
     "/search?q=destination",
     "/account/profile",
     ...(role === "admin"
-      ? ["/admin/settings", "/admin/users", "/admin/classrooms", "/admin/audit-logs"]
+      ? ["/admin/settings", "/admin/users", "/admin/classrooms", "/admin/audit-logs", "/admin/rooms"]
       : []),
     calendarPath(),
     ...(role === "admin" ? ["/timetable/clashes"] : []),

@@ -150,3 +150,39 @@ export function dismissClashAction(clashId: string) {
     "Couldn't dismiss the clash. Please try again.",
   );
 }
+
+// ---- Rooms (admin) ----------------------------------------------------------------
+// Under ["timetable"], so every timetable change refreshes it and vice versa.
+
+export interface RoomRow {
+  id: string;
+  number: string;
+  floor: number;
+  isActive: boolean;
+  /** Classes booked in this room each week. */
+  weeklyClasses: number;
+}
+
+export function useRooms() {
+  return useQuery({
+    queryKey: ["timetable", "admin-rooms"],
+    queryFn: () => apiGet<{ rooms: RoomRow[] }>("/admin/rooms"),
+  });
+}
+
+export function createRoomAction(number: string) {
+  return apiAction<{ room: RoomRow; message: string }>(
+    "post",
+    "/admin/rooms",
+    { number },
+    "Couldn't add the room. Please try again.",
+  );
+}
+
+export function setRoomActiveAction(roomId: string, isActive: boolean) {
+  return apiAction("post", `/admin/rooms/${roomId}/status`, { isActive }, "Couldn't update the room. Please try again.");
+}
+
+export function deleteRoomAction(roomId: string) {
+  return apiAction("delete", `/admin/rooms/${roomId}`, undefined, "Couldn't delete the room. Please try again.");
+}

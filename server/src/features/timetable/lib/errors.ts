@@ -7,7 +7,8 @@ export type TimetableErrorCode =
   | "TEACHER_BUSY"
   | "ROOM_TAKEN"
   | "ALREADY_SCHEDULED"
-  | "CLASH_NOT_PENDING";
+  | "CLASH_NOT_PENDING"
+  | "DUPLICATE";
 
 export class TimetableServiceError extends Error {
   constructor(

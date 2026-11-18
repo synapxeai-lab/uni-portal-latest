@@ -9,10 +9,13 @@ import {
   CacheTtl,
   invalidateAllAcademic,
   invalidateClassroom,
+  invalidateTimetable,
   invalidateUniversity,
   invalidateUser,
 } from "@/lib/cache/tags";
 import { ClassroomStatus, UserRole, UserStatus } from "@/generated/prisma/enums";
+
+import * as roomService from "@/features/timetable/services/room-service";
 
 import * as auditLogService from "./audit-logs/services/audit-log-service";
 import * as classroomAdminService from "./classrooms/services/classroom-admin-service";
@@ -236,3 +239,36 @@ adminRouter.get("/audit-logs", async (req, res) => {
   );
   res.json(page);
 });
+
+// ---- Rooms: the shared timetable's rows ------------------------------------------
+
+adminRouter.get("/rooms", async (_req, res) => {
+  const rooms = await cached("admin:rooms", { ttl: CacheTtl.CLASSROOM, tags: [CacheTags.TIMETABLE] }, () =>
+    roomService.listRooms(),
+  );
+  res.json({ rooms });
+});
+
+adminRouter.post("/rooms", async (req, res) => {
+  const room = await roomService.createRoom(parseInput(roomService.createRoomSchema, req.body));
+  invalidateTimetable();
+  res.status(201).json({ status: "success", data: { room, message: `Room ${room.number} added.` } });
+});
+
+function roomIdOf(req: Request): string {
+  return parseParams(z.object({ roomId: z.string().uuid() }), req.params, "Invalid room.").roomId;
+}
+
+adminRouter.post("/rooms/:roomId/status", async (req, res) => {
+  const { isActive } = parseInput(roomService.roomStatusSchema, req.body);
+  await roomService.setRoomActive(roomIdOf(req), isActive);
+  invalidateTimetable();
+  res.json({ status: "success", data: undefined });
+});
+
+adminRouter.delete("/rooms/:roomId", async (req, res) => {
+  await roomService.deleteRoom(roomIdOf(req));
+  invalidateTimetable();
+  res.json({ status: "success", data: undefined });
+});
+
