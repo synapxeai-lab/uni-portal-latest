@@ -1,7 +1,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "@/lib/navigation";
 import {
-  Archive,
   Ban,
   Eye,
   KeyRound,
@@ -9,7 +8,7 @@ import {
   MoreVertical,
   Pencil,
   RotateCcw,
-  ShieldAlert,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -24,7 +23,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserStatus } from "@portal/shared/enums";
 
-import { forcePasswordChangeAction, resetPasswordAction, viewPasswordAction } from "../api";
+import {
+  deleteUserAction,
+  viewPasswordAction,
+} from "../api";
+import { ChangePasswordDialog } from "./change-password-dialog";
 import { EditUserDialog } from "./edit-user-dialog";
 import { TemporaryPasswordDialog } from "./temporary-password-dialog";
 import { UserDetailsSheet } from "./user-details-sheet";
@@ -39,7 +42,20 @@ type ConfirmAction =
       confirmLabel: string;
       destructive?: boolean;
     }
-  | { type: "forcePasswordChange" };
+  | { type: "delete" };
+
+function deleteDescription(user: AdminUserSummary): string {
+  const record = user.academicRecord
+    ? ` Their ${user.role === "TEACHER" ? "teacher" : "student"} record is deleted too${
+        user.role === "STUDENT" ? ", with their registrations" : ""
+      }.`
+    : "";
+  const work =
+    user.role === "STUDENT"
+      ? " Their submissions, comments and posts are removed."
+      : " Course classrooms they own, and the classwork they posted, pass to you; classrooms they made themselves are removed.";
+  return `This permanently deletes ${user.name}'s account (${user.email}).${record}${work} This cannot be undone.`;
+}
 
 interface UserRowActionsProps {
   user: AdminUserSummary;
@@ -54,21 +70,10 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
   const [editOpen, setEditOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState<string | null>(null);
 
   const isArchived = user.status === UserStatus.ARCHIVED;
-
-  function handleResetPassword() {
-    startTransition(async () => {
-      const result = await resetPasswordAction(user.id);
-      if (result.status === "success") {
-        setTemporaryPassword(result.data.temporaryPassword);
-      } else {
-        toast.error(result.message);
-      }
-    });
-  }
 
   function handleViewPassword() {
     startTransition(async () => {
@@ -78,7 +83,7 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
           setCurrentPassword(password);
         } else {
           toast.error(
-            "This password can't be shown: it was saved before passwords became viewable, or with another server's key. Reset it to get a viewable one.",
+            "This password can't be shown: it was saved before passwords became viewable, or with another server's key. Change it to get a viewable one.",
           );
         }
       } catch {
@@ -103,9 +108,9 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
     }
 
     startTransition(async () => {
-      const result = await forcePasswordChangeAction(user.id);
+      const result = await deleteUserAction(user.id);
       if (result.status === "success") {
-        toast.success(`${user.name} must set a new password on next sign-in.`);
+        toast.success(`${user.name} deleted.`);
       } else {
         toast.error(result.message);
       }
@@ -139,14 +144,8 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
           <DropdownMenuItem onSelect={handleViewPassword} disabled={!user.hasViewablePassword}>
             <LockKeyhole /> View password
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleResetPassword} disabled={isSelf || isArchived}>
-            <KeyRound /> Reset password
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => setConfirmAction({ type: "forcePasswordChange" })}
-            disabled={isSelf || user.status !== UserStatus.ACTIVE}
-          >
-            <ShieldAlert /> Force password change
+          <DropdownMenuItem onSelect={() => setPasswordOpen(true)} disabled={isSelf || isArchived}>
+            <KeyRound /> Change password
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {user.status === UserStatus.ACTIVE ? (
@@ -181,44 +180,7 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
               <RotateCcw /> Reactivate
             </DropdownMenuItem>
           ) : null}
-          {user.status === UserStatus.ACTIVE ? (
-            <DropdownMenuItem
-              onSelect={() =>
-                setConfirmAction({
-                  type: "status",
-                  status: UserStatus.SUSPENDED,
-                  title: `Suspend ${user.name}?`,
-                  description:
-                    "They will be immediately blocked from signing in until reactivated.",
-                  confirmLabel: "Suspend",
-                  destructive: true,
-                })
-              }
-              className="text-destructive focus:text-destructive"
-              disabled={isSelf}
-            >
-              <ShieldAlert /> Suspend
-            </DropdownMenuItem>
-          ) : null}
-          {!isArchived ? (
-            <DropdownMenuItem
-              onSelect={() =>
-                setConfirmAction({
-                  type: "status",
-                  status: UserStatus.ARCHIVED,
-                  title: `Archive ${user.name}?`,
-                  description:
-                    "This soft-deletes the account. They lose access immediately, and the account can be restored later.",
-                  confirmLabel: "Archive",
-                  destructive: true,
-                })
-              }
-              className="text-destructive focus:text-destructive"
-              disabled={isSelf}
-            >
-              <Archive /> Archive (soft delete)
-            </DropdownMenuItem>
-          ) : (
+          {isArchived ? (
             <DropdownMenuItem
               onSelect={() =>
                 setConfirmAction({
@@ -233,7 +195,15 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
             >
               <RotateCcw /> Restore
             </DropdownMenuItem>
-          )}
+          ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => setConfirmAction({ type: "delete" })}
+            className="text-destructive focus:text-destructive"
+            disabled={isSelf}
+          >
+            <Trash2 /> Delete user
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -252,16 +222,12 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
             setConfirmAction(null);
           }
         }}
-        title={confirmAction?.type === "status" ? confirmAction.title : "Force password change?"}
+        title={confirmAction?.type === "status" ? confirmAction.title : `Delete ${user.name}?`}
         description={
-          confirmAction?.type === "status"
-            ? confirmAction.description
-            : `${user.name} will be required to set a new password the next time they sign in.`
+          confirmAction?.type === "status" ? confirmAction.description : deleteDescription(user)
         }
-        confirmLabel={
-          confirmAction?.type === "status" ? confirmAction.confirmLabel : "Force change"
-        }
-        destructive={confirmAction?.type === "status" ? confirmAction.destructive : false}
+        confirmLabel={confirmAction?.type === "status" ? confirmAction.confirmLabel : "Delete"}
+        destructive={confirmAction?.type === "status" ? confirmAction.destructive : true}
         pending={isPending}
         onConfirm={handleConfirm}
       />
@@ -280,16 +246,12 @@ export function UserRowActions({ user, isSelf, onStatusChange, onUpdated }: User
         />
       ) : null}
 
-      {temporaryPassword ? (
-        <TemporaryPasswordDialog
-          open={temporaryPassword !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              setTemporaryPassword(null);
-            }
-          }}
-          userName={user.name}
-          temporaryPassword={temporaryPassword}
+      {passwordOpen ? (
+        <ChangePasswordDialog
+          user={user}
+          open
+          onOpenChange={setPasswordOpen}
+          onChanged={() => router.refresh()}
         />
       ) : null}
     </>

@@ -7,16 +7,15 @@
  *   node dist/remove-orphan-users.js --confirm  deletes them
  *   (locally: npx tsx scripts/remove-orphan-users.ts [--confirm])
  *
- * For each account, what it made goes with it: classrooms it created by hand
- * (with everything inside), and its posts, classwork, comments, submissions,
- * files, timetable slots/requests, memberships and audit-log entries.
- * A course section's classroom it still owns is NOT deleted - it is handed to
- * an admin, so the section keeps its classroom. Each account is removed in its
- * own transaction: if one fails, it is reported and the rest carry on.
- * Uploaded files' database rows are removed; their bytes stay in storage.
+ * Each account is deleted the same way as "Delete user" on the Users page
+ * (src/lib/delete-account.ts), with the first active admin taking over a course
+ * section's classroom it owns and a teacher's material in it. Each account is
+ * removed in its own transaction: if one fails, it is reported and the rest
+ * carry on.
  */
+import { deleteAccount } from "@/lib/delete-account";
 import { prisma } from "@/lib/prisma";
-import { ClassroomMembershipRole, ClassroomMembershipStatus, UserRole, UserStatus } from "@/generated/prisma/enums";
+import { UserRole, UserStatus } from "@/generated/prisma/enums";
 
 const confirm = process.argv.includes("--confirm");
 
@@ -74,50 +73,7 @@ const failed: string[] = [];
 
 for (const user of orphans) {
   try {
-    await prisma.$transaction(async (tx) => {
-      const owned = await tx.classroom.findMany({
-        where: { ownerId: user.id },
-        select: { id: true, sectionCourseId: true, offeringKey: true },
-      });
-
-      for (const classroom of owned) {
-        const isSectionClassroom = classroom.sectionCourseId !== null || classroom.offeringKey !== null;
-        if (isSectionClassroom) {
-          if (!fallbackAdmin) {
-            throw new Error("owns a course section's classroom and there is no active admin to hand it to");
-          }
-          await tx.classroom.update({ where: { id: classroom.id }, data: { ownerId: fallbackAdmin.id } });
-          await tx.classroomMembership.upsert({
-            where: { classroomId_userId: { classroomId: classroom.id, userId: fallbackAdmin.id } },
-            update: { role: ClassroomMembershipRole.OWNER, status: ClassroomMembershipStatus.ACTIVE },
-            create: {
-              classroomId: classroom.id,
-              userId: fallbackAdmin.id,
-              role: ClassroomMembershipRole.OWNER,
-              status: ClassroomMembershipStatus.ACTIVE,
-            },
-          });
-        } else {
-          // A hand-made test class: everything inside goes with it.
-          await tx.classroom.delete({ where: { id: classroom.id } });
-        }
-      }
-
-      const mine = { where: { authorId: user.id } };
-      await tx.comment.deleteMany(mine);
-      await tx.submission.deleteMany({ where: { studentId: user.id } });
-      await tx.assignment.deleteMany(mine);
-      await tx.announcement.deleteMany(mine);
-      await tx.material.deleteMany(mine);
-      await tx.timetableClash.deleteMany({ where: { requestedById: user.id } });
-      await tx.timetableSlot.deleteMany({ where: { teacherId: user.id } });
-      await tx.invitation.deleteMany({ where: { invitedById: user.id } });
-      await tx.file.deleteMany({ where: { uploadedById: user.id } });
-      await tx.classroomMembership.deleteMany({ where: { userId: user.id } });
-      await tx.activityLog.deleteMany({ where: { actorId: user.id } });
-      // Sessions and notifications go with the user; login history keeps its rows.
-      await tx.user.delete({ where: { id: user.id } });
-    });
+    await deleteAccount(user.id, fallbackAdmin?.id ?? null);
     removed += 1;
     console.log(`  removed: ${user.name} <${user.email}>`);
   } catch (error) {

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { parseInput } from "@/http/validate";
 import { cached } from "@/lib/cache/tagged-cache";
 import { CacheTags, CacheTtl, invalidateAdmin, invalidateUniversity } from "@/lib/cache/tags";
-import { requireAdmin } from "@/middleware/auth";
+import { currentUser, requireAdmin } from "@/middleware/auth";
 
 import { done, intParam, parseInputAsync, strQuery } from "./lib/http";
 import * as people from "./services/people-service";
@@ -53,9 +53,9 @@ peopleRouter.put("/teachers/:id", async (req, res) => {
 });
 
 peopleRouter.delete("/teachers/:id", async (req, res) => {
-  await people.deleteTeacher(intParam(req, "id", "teacher ID"));
+  await people.deleteTeacher(intParam(req, "id", "teacher ID"), currentUser(req).id);
   invalidatePeople();
-  done(res, { message: "Teacher deleted and their login archived." });
+  done(res, { message: "Teacher and their login deleted." });
 });
 
 // ---- Students -------------------------------------------------------------------------
@@ -90,9 +90,9 @@ peopleRouter.put("/students/:id", async (req, res) => {
 });
 
 peopleRouter.delete("/students/:id", async (req, res) => {
-  await people.deleteStudent(intParam(req, "id", "student ID"));
+  await people.deleteStudent(intParam(req, "id", "student ID"), currentUser(req).id);
   invalidatePeople();
-  done(res, { message: "Student deleted and their login archived." });
+  done(res, { message: "Student and their login deleted." });
 });
 
 // ---- Section membership -----------------------------------------------------------------

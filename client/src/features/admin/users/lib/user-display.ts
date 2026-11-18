@@ -43,11 +43,7 @@ export const allStatuses = [
   UserStatus.LOCKED,
 ] as const;
 
-// Statuses an admin can set directly via the status menu - PENDING_PASSWORD_CHANGE
-// is only ever reached through the force-password-change action.
-export const settableStatuses = [
-  UserStatus.ACTIVE,
-  UserStatus.INACTIVE,
-  UserStatus.SUSPENDED,
-  UserStatus.ARCHIVED,
-] as const;
+// Statuses an admin can set directly. Suspend did the same as deactivate and
+// accounts are deleted rather than archived; SUSPENDED and ARCHIVED remain
+// only for older accounts, which can be reactivated.
+export const settableStatuses = [UserStatus.ACTIVE, UserStatus.INACTIVE] as const;

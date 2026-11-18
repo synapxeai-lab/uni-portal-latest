@@ -196,7 +196,7 @@ export default function TeachersPage() {
       <ClassicConfirm
         open={deleting !== null}
         title="Delete Teacher"
-        message={`Are you sure you want to delete "${deleting?.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleting?.name}"? Their login is deleted too; their course classrooms and classwork pass to you. This action cannot be undone.`}
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
       />

@@ -2,7 +2,12 @@ import type { SessionUser } from "@/auth/session";
 import { generateTemporaryPassword } from "@/lib/auth/generate-password";
 import { passwordFields } from "@/lib/auth/password";
 import { decryptPassword } from "@/lib/auth/password-vault";
+import * as people from "@/features/academics/services/people-service";
+import { badRequest } from "@/http/errors";
 import { recordAuditEvent } from "@/lib/audit-log";
+import { getPasswordPolicyViolations } from "@/lib/password-policy";
+import { getSystemSettings } from "@/lib/system-settings";
+import { deleteAccount } from "@/lib/delete-account";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { ActivityAction, UserRole, UserStatus } from "@/generated/prisma/enums";
@@ -13,7 +18,6 @@ import type {
   AdminUserSummary,
   CreatedUserResult,
   ListUsersParams,
-  ResetPasswordResult,
   UsersPage,
 } from "../types";
 import type { CreateUserInput, UpdateUserInput } from "../validation/user-schema";
@@ -259,24 +263,19 @@ export async function setUserStatus(
     select: summarySelect,
   });
 
-  if (status === UserStatus.SUSPENDED) {
-    await recordAuditEvent({
-      actorId: actor.id,
-      action: ActivityAction.SUSPENDED,
-      entityType: "User",
-      entityId: user.id,
-      targetLabel: userTargetLabel(user),
-      metadata: { previousStatus: existing.status },
-    });
-  }
-
   return toSummary(user);
 }
 
-export async function resetPassword(
+/**
+ * The admin sets a user's password to one they choose ("Change password" on
+ * the Users page). It must meet the password policy. The user signs in with it
+ * straight away - no forced change - and the wrong-password count starts afresh.
+ */
+export async function setPassword(
   userId: string,
+  password: string,
   actor: SessionUser,
-): Promise<ResetPasswordResult> {
+): Promise<void> {
   if (userId === actor.id) {
     throw new AdminUserServiceError(
       "CANNOT_MODIFY_SELF",
@@ -289,19 +288,20 @@ export async function resetPassword(
     throw new AdminUserServiceError("NOT_FOUND", "User not found.");
   }
 
-  if (existing.status === UserStatus.ARCHIVED) {
-    throw new AdminUserServiceError(
-      "VALIDATION_ERROR",
-      "Reactivate this user before resetting their password.",
-    );
+  const violations = getPasswordPolicyViolations(password, await getSystemSettings());
+  if (violations.length) {
+    throw badRequest(violations[0], { password: violations });
   }
-
-  const temporaryPassword = generateTemporaryPassword();
-  const passwordData = await passwordFields(temporaryPassword);
 
   await prisma.user.update({
     where: { id: userId },
-    data: { ...passwordData, mustChangePassword: true, failedLoginAttempts: 0 },
+    data: {
+      ...(await passwordFields(password)),
+      mustChangePassword: false,
+      failedLoginAttempts: 0,
+      // A pending forced change is satisfied by the new password.
+      ...(existing.status === UserStatus.PENDING_PASSWORD_CHANGE ? { status: UserStatus.ACTIVE } : {}),
+    },
   });
 
   await recordAuditEvent({
@@ -311,34 +311,54 @@ export async function resetPassword(
     entityId: userId,
     targetLabel: userTargetLabel(existing),
   });
-
-  return { temporaryPassword };
 }
 
-export async function forcePasswordChange(userId: string, actor: SessionUser): Promise<void> {
+/**
+ * Permanently deletes an account (lib/delete-account.ts). A student or teacher
+ * record linked to it is deleted too, through the people service, so their
+ * registrations and classes stay in sync. The acting admin takes over the
+ * course classrooms and teaching material that must outlive the account.
+ * Returns the ids of classrooms that changed.
+ */
+export async function deleteUser(userId: string, actor: SessionUser): Promise<string[]> {
   if (userId === actor.id) {
-    throw new AdminUserServiceError(
-      "CANNOT_MODIFY_SELF",
-      'Use "Change password" in your account menu to change your own password.',
-    );
+    throw new AdminUserServiceError("CANNOT_MODIFY_SELF", "You can't delete your own account.");
   }
 
-  const existing = await prisma.user.findUnique({ where: { id: userId } });
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      studentProfile: { select: { id: true } },
+      teacherProfile: { select: { id: true } },
+    },
+  });
   if (!existing) {
     throw new AdminUserServiceError("NOT_FOUND", "User not found.");
   }
 
-  if (existing.status !== UserStatus.ACTIVE) {
-    throw new AdminUserServiceError(
-      "VALIDATION_ERROR",
-      "Only active users can be required to change their password.",
-    );
+  let classroomIds: string[] = [];
+  if (existing.studentProfile) {
+    await people.deleteStudent(existing.studentProfile.id, actor.id);
+  } else if (existing.teacherProfile) {
+    await people.deleteTeacher(existing.teacherProfile.id, actor.id);
+  } else {
+    classroomIds = await deleteAccount(userId, actor.id);
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { status: UserStatus.PENDING_PASSWORD_CHANGE, mustChangePassword: true },
+  await recordAuditEvent({
+    actorId: actor.id,
+    action: ActivityAction.DELETED,
+    entityType: "User",
+    entityId: userId,
+    targetLabel: userTargetLabel(existing),
+    metadata: { role: existing.role },
   });
+
+  return classroomIds;
 }
 
 /**

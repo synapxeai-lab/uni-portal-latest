@@ -51,7 +51,3 @@ export interface CreatedUserResult {
   user: AdminUserSummary;
   temporaryPassword: string;
 }
-
-export interface ResetPasswordResult {
-  temporaryPassword: string;
-}

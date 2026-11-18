@@ -210,7 +210,7 @@ export default function StudentsPage() {
       <ClassicConfirm
         open={deleting !== null}
         title="Delete Student"
-        message={`Are you sure you want to delete "${deleting?.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleting?.name}"? Their registrations, login and submitted work are deleted too. This action cannot be undone.`}
         pending={pending}
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}

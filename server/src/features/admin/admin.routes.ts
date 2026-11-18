@@ -4,7 +4,14 @@ import { z } from "zod";
 import { parseInput, parseParams } from "@/http/validate";
 import { currentUser } from "@/middleware/auth";
 import { cached } from "@/lib/cache/tagged-cache";
-import { CacheTags, CacheTtl, invalidateAllAcademic, invalidateUser } from "@/lib/cache/tags";
+import {
+  CacheTags,
+  CacheTtl,
+  invalidateAllAcademic,
+  invalidateClassroom,
+  invalidateUniversity,
+  invalidateUser,
+} from "@/lib/cache/tags";
 import { ClassroomStatus, UserRole, UserStatus } from "@/generated/prisma/enums";
 
 import * as auditLogService from "./audit-logs/services/audit-log-service";
@@ -18,6 +25,7 @@ import * as userService from "./users/services/user-service";
 import type { ListUsersParams, UserSortField } from "./users/types";
 import {
   createUserSchema,
+  setPasswordSchema,
   setUserStatusSchema,
   updateUserSchema,
 } from "./users/validation/user-schema";
@@ -108,17 +116,32 @@ adminRouter.post("/users/:userId/status", async (req, res) => {
   );
   const user = await userService.setUserStatus(userId, status, currentUser(req));
   invalidateAllAcademic();
-  // Suspending/deactivating ends their access on their very next request.
+  // Deactivating ends their access on their very next request.
   invalidateUser(userId);
   res.json({ status: "success", data: user });
 });
 
-adminRouter.post("/users/:userId/reset-password", async (req, res) => {
+adminRouter.delete("/users/:userId", async (req, res) => {
   const userId = userIdOf(req);
-  const result = await userService.resetPassword(userId, currentUser(req));
+  const classroomIds = await userService.deleteUser(userId, currentUser(req));
+  invalidateAllAcademic();
+  invalidateUniversity();
+  invalidateUser(userId);
+  if (classroomIds.length) {
+    invalidateClassroom(...classroomIds);
+  }
+  res.json({ status: "success", data: undefined });
+});
+
+adminRouter.put("/users/:userId/password", async (req, res) => {
+  const { userId, password } = parseInput(setPasswordSchema, {
+    userId: req.params.userId,
+    password: req.body?.password,
+  });
+  await userService.setPassword(userId, password, currentUser(req));
   invalidateAllAcademic();
   invalidateUser(userId);
-  res.json({ status: "success", data: result });
+  res.json({ status: "success", data: undefined });
 });
 
 adminRouter.get("/users/:userId/password", async (req, res) => {
@@ -127,13 +150,6 @@ adminRouter.get("/users/:userId/password", async (req, res) => {
   res.set("Cache-Control", "no-store").json(await userService.viewPassword(userIdOf(req)));
 });
 
-adminRouter.post("/users/:userId/force-password-change", async (req, res) => {
-  const userId = userIdOf(req);
-  await userService.forcePasswordChange(userId, currentUser(req));
-  invalidateAllAcademic();
-  invalidateUser(userId);
-  res.json({ status: "success", data: undefined });
-});
 
 // ---- Classrooms -----------------------------------------------------------------------
 

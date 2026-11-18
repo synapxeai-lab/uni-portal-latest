@@ -78,8 +78,36 @@ describe("admin-viewable passwords", () => {
     const afterChange = await admin.get<{ password: string }>(`/admin/users/${user.id}/password`);
     expect(afterChange.data.password).toBe("MyOwnPass1");
 
-    // Archive the test account so it doesn't clutter the users list.
-    await admin.post(`/admin/users/${user.id}/status`, { status: "ARCHIVED" });
+    // The admin changes it to one they choose: it must meet the policy, and works straight away.
+    const weak = await admin.put(`/admin/users/${user.id}/password`, { password: "x" });
+    expect(weak.status).toBe(400);
+    expect(weak.body).toHaveProperty("fieldErrors.password");
+    expect((await admin.put(`/admin/users/${user.id}/password`, { password: "AdminSet123" })).status).toBe(200);
+    expect((await admin.get<{ password: string }>(`/admin/users/${user.id}/password`)).data.password).toBe("AdminSet123");
+    const fresh = await new ApiSession().login(email, "AdminSet123");
+    const me = await fresh.get<{ mustChangePassword: boolean }>("/auth/session");
+    expect(me.data.mustChangePassword).toBe(false);
+
+    // Delete the test account so it doesn't clutter the users list.
+    expect((await admin.delete(`/admin/users/${user.id}`)).status).toBe(200);
+    const gone = await admin.get<{ users: UserRow[] }>(`/admin/users?q=${encodeURIComponent(email)}`);
+    expect(gone.data.users).toHaveLength(0);
+  });
+
+  it("won't archive or self-delete, and is admin-only", async () => {
+    const admin = await signIn("admin");
+    const users = await admin.get<{ users: UserRow[] }>(
+      `/admin/users?q=${encodeURIComponent(ACCOUNTS.admin.email)}`,
+    );
+    const self = users.data.users[0];
+    expect((await admin.delete(`/admin/users/${self.id}`)).status).not.toBe(200);
+    const student = (
+      await admin.get<{ users: UserRow[] }>(`/admin/users?q=${encodeURIComponent(ACCOUNTS.student.email)}`)
+    ).data.users[0];
+    expect((await admin.post(`/admin/users/${student.id}/status`, { status: "ARCHIVED" })).status).toBe(400);
+    expect((await admin.post(`/admin/users/${student.id}/status`, { status: "SUSPENDED" })).status).toBe(400);
+    const teacher = await signIn("teacher");
+    expect((await teacher.delete(`/admin/users/${student.id}`)).status).toBe(403);
   });
 
   it("is admin-only", async () => {

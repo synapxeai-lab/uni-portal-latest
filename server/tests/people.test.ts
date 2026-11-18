@@ -43,7 +43,7 @@ describe("people API", () => {
     admin = await signIn("admin");
   });
 
-  it("creates a teacher with a login, syncs edits to it and archives it on delete", async () => {
+  it("creates a teacher with a login, syncs edits to it and deletes it on delete", async () => {
     const email = `${unique("teacher")}@eithm.edu.pk`;
     const created = await admin.post<{ teacher: Teacher; login: Login }>("/teachers", {
       name: "Test Teacher",
@@ -80,10 +80,10 @@ describe("people API", () => {
     );
     expect(users.data.users[0].name).toBe("Renamed Teacher");
 
-    // Deleting the profile archives (doesn't delete) the login and signs it out.
+    // Deleting the profile deletes the login too and signs it out.
     expect((await admin.delete(`/teachers/${teacher.id}`)).status).toBe(200);
-    const after = await admin.get<{ users: { status: string }[] }>(`/admin/users?q=${encodeURIComponent(email)}&status=ARCHIVED`);
-    expect(after.data.users[0].status).toBe("ARCHIVED");
+    const after = await admin.get<{ users: { status: string }[] }>(`/admin/users?q=${encodeURIComponent(email)}`);
+    expect(after.data.users).toHaveLength(0);
     expect((await session.get("/auth/session")).body).not.toHaveProperty("user.role", "TEACHER");
   });
 

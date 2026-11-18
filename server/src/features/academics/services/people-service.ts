@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { UserRole } from "@/generated/prisma/enums";
 import { badRequest } from "@/http/errors";
+import { invalidateClassroom, invalidateUser } from "@/lib/cache/tags";
+import { DELETE_ACCOUNT_TX, deleteAccountTx } from "@/lib/delete-account";
 import { prisma } from "@/lib/prisma";
 
 import { getBatchYears, isValidBatch } from "../lib/batches";
@@ -12,7 +14,7 @@ import { syncEnrolledSection } from "../lib/section-sync";
 import { syncClassroomsFor } from "../lib/offering-classrooms";
 import { amountField, payError, TEACHER_TYPES } from "../lib/teacher-pay";
 import { computeStudentSemester, withCurrentDiplomas } from "../lib/terms";
-import { archiveLogin, ensureLoginFor, syncLogin } from "../lib/user-accounts";
+import { ensureLoginFor, syncLogin } from "../lib/user-accounts";
 
 const cnic = (label: string) =>
   z.string().trim().regex(/^\d{5}-\d{7}-\d$/, `${label} must be in format 12345-1234567-1`);
@@ -118,13 +120,34 @@ export async function updateTeacher(id: number, input: z.infer<typeof updateTeac
   return teacher;
 }
 
-export async function deleteTeacher(id: number) {
+/**
+ * Deleting a record deletes its login too (lib/delete-account.ts), in one
+ * transaction. The admin doing it (`heirId`) takes over the course classrooms
+ * the login owned and the teaching material in them.
+ */
+async function deleteRecordAndLogin(
+  userId: string | null,
+  heirId: string,
+  deleteRecord: (tx: Prisma.TransactionClient) => Promise<unknown>,
+) {
+  const classroomIds = await prisma.$transaction(async (tx) => {
+    await deleteRecord(tx);
+    return userId ? deleteAccountTx(tx, userId, heirId) : [];
+  }, DELETE_ACCOUNT_TX);
+  if (userId) {
+    invalidateUser(userId);
+  }
+  if (classroomIds.length) {
+    invalidateClassroom(...classroomIds);
+  }
+}
+
+export async function deleteTeacher(id: number, heirId: string) {
   const target = await prisma.teacher.findUnique({ where: { id } });
   if (!target) {
     throw notFoundError("Teacher not found.");
   }
-  await prisma.teacher.delete({ where: { id } });
-  await archiveLogin(target.userId);
+  await deleteRecordAndLogin(target.userId, heirId, (tx) => tx.teacher.delete({ where: { id } }));
 }
 
 // ---- Students -------------------------------------------------------------------------
@@ -312,7 +335,7 @@ export async function updateStudent(id: number, input: z.infer<typeof updateStud
   return student;
 }
 
-export async function deleteStudent(id: number) {
+export async function deleteStudent(id: number, heirId: string) {
   const target = await prisma.student.findUnique({ where: { id } });
   if (!target) {
     throw notFoundError("Student not found.");
@@ -323,8 +346,7 @@ export async function deleteStudent(id: number) {
     select: { courseId: true, sectionId: true },
     distinct: ["courseId", "sectionId"],
   });
-  await prisma.student.delete({ where: { id } });
-  await archiveLogin(target.userId);
+  await deleteRecordAndLogin(target.userId, heirId, (tx) => tx.student.delete({ where: { id } }));
   await syncClassroomsFor(pairs);
 }
 

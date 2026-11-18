@@ -34,12 +34,18 @@ export const updateUserSchema = z.object({
 
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
-// Only the statuses an admin can set directly via the status menu -
-// PENDING_PASSWORD_CHANGE is exclusively driven by the force-password-change
-// action, not a freely selectable target status.
+// The statuses an admin can set: Active (reactivate/restore/unlock) and
+// Inactive (deactivate). Suspend did the same as deactivate and archive is
+// replaced by deleting (DELETE /admin/users/:userId); SUSPENDED and ARCHIVED
+// stay only for older accounts, which can be reactivated.
 export const setUserStatusSchema = z.object({
   userId: z.string().uuid("Invalid user id."),
-  status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED", "ARCHIVED"]),
+  status: z.enum(["ACTIVE", "INACTIVE"]),
+});
+
+export const setPasswordSchema = z.object({
+  userId: z.string().uuid("Invalid user id."),
+  password: z.string().min(1, "Enter a password.").max(128, "Password must be at most 128 characters."),
 });
 
 export type SetUserStatusInput = z.infer<typeof setUserStatusSchema>;

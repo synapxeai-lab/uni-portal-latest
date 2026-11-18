@@ -65,7 +65,7 @@ Start with the admin account; you'll repeat M1-10 to M1-13 with the new teacher 
 - [ ] **M1-11** **Edge** On Change password, current password `Wrong@123` → "Current password is incorrect."
 - [ ] **M1-12** **Edge** New password `Sadia@2027`, confirm `Sadia@2028` → mismatch error; new password `123` → too short.
 - [ ] **M1-13** Current = temporary password, new and confirm = **`Sadia@2027`** → saved. Sign out and back in with `Sadia@2027` → works; the temporary one is refused.
-- [ ] **M1-14** **Edge** *(after M3-15)* An archived user tries to sign in → refused.
+- [ ] **M1-14** **Edge** *(after M3-15)* A deactivated user tries to sign in → refused.
 
 ## M2. Academic structure (admin)
 
@@ -183,9 +183,9 @@ Batch **2026** already exists and your real students are in it; you're only addi
 
 - [ ] **M3-11** Filter role = Student, search `ahsan` → Ahsan Mehmood is listed, status Active.
 - [ ] **M3-12** **View password** on Ms. Sadia Rehman (after she changed it in M1-13) → shows **`Sadia@2027`**.
-- [ ] **M3-13** **Reset password** on Mahnoor Tariq → a new temporary password is shown; note it. Signing in as her forces a password change; set it to **`Mahnoor@2027`**.
-- [ ] **M3-14** **Force password change** on Ahsan Mehmood → on his next page load he's sent to Change password; set it to **`Ahsan@2027`**.
-- [ ] **M3-15** Set Daniyal Shah to **Archived** → he can't sign in (M1-14); set him back to **Active** → he can.
+- [ ] **M3-13** **Change password** on Mahnoor Tariq: a too-short password is refused with the policy message; set **`Mahnoor@2027`** → she signs in with it straight away, with no forced change.
+- [ ] **M3-14** The Users page menu has no Suspend, Force password change or Archive options; it has **Delete user** (not on your own account).
+- [ ] **M3-15** **Deactivate** Daniyal Shah → he can't sign in (M1-14); **Reactivate** him → he can.
 - [ ] **M3-16** **Edge** On your own admin row: changing your role / locking yourself is refused or disabled.
 
 Now go back and do **M1-9 to M1-14** with these accounts. From here on, use **Ms. Sadia Rehman** as "the teacher" and **Ahsan Mehmood** as "the student".
@@ -445,4 +445,4 @@ Everything created here belongs to the **Event Management** programme and its **
 - students **Ahsan Mehmood**, **Mahnoor Tariq**, **Daniyal Shah**
 - the hand-made class **Event Management Study Circle**
 
-To remove it, archive those users and delete the DEM offerings, courses, the DEM sections in batch 2026, the diploma and the Event Management programme (in that order), or ask for a cleanup script. If you'd like to keep Event Management as a real programme, just delete the five people and the study circle.
+To remove it, delete those users and delete the DEM offerings, courses, the DEM sections in batch 2026, the diploma and the Event Management programme (in that order), or ask for a cleanup script. If you'd like to keep Event Management as a real programme, just delete the five people and the study circle.

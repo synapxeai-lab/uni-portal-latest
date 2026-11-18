@@ -80,19 +80,3 @@ export async function syncLogin(userId: string | null, profile: { name: string; 
     invalidateUser(userId);
   }
 }
-
-/**
- * When a profile is deleted its login is archived rather than deleted: the
- * account may own classrooms, posts and submissions that must keep their
- * author. Archiving signs it out on the very next request.
- */
-export async function archiveLogin(userId: string | null) {
-  if (!userId) {
-    return;
-  }
-  await prisma.user.update({
-    where: { id: userId },
-    data: { status: UserStatus.ARCHIVED, archivedAt: new Date() },
-  });
-  invalidateUser(userId);
-}

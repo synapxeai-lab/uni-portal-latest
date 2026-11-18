@@ -7,7 +7,6 @@ import type {
   AdminUserDetail,
   AdminUserSummary,
   CreatedUserResult,
-  ResetPasswordResult,
   UsersPage,
 } from "./types";
 
@@ -61,21 +60,27 @@ export function setUserStatusAction(userId: string, status: string) {
   );
 }
 
-export function resetPasswordAction(userId: string) {
-  return apiAction<ResetPasswordResult>(
-    "post",
-    `/admin/users/${userId}/reset-password`,
+/** Permanently deletes the account (and its student/teacher record, if any). */
+export function deleteUserAction(userId: string) {
+  return apiAction(
+    "delete",
+    `/admin/users/${userId}`,
     undefined,
-    "Couldn't reset this user's password. Please try again.",
+    "Couldn't delete this user. Please try again.",
   );
 }
 
-export function forcePasswordChangeAction(userId: string) {
+/** Sets the user's password to one the admin chooses (form: userId, password). */
+export function setPasswordAction(
+  _prevState: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { userId, password } = formDataToObject(formData);
   return apiAction(
-    "post",
-    `/admin/users/${userId}/force-password-change`,
-    undefined,
-    "Couldn't force a password change for this user. Please try again.",
+    "put",
+    `/admin/users/${userId}/password`,
+    { password },
+    "Couldn't change this user's password. Please try again.",
   );
 }
 
