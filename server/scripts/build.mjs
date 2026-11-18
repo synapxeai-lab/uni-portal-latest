@@ -19,6 +19,8 @@ await build({
     // backfill-viewable-passwords: re-encrypts admin-viewable password copies with this
     // server's key after a database copy (see docs/deploy-dokploy.md).
     "backfill-viewable-passwords": "scripts/backfill-viewable-passwords.ts",
+    // remove-orphan-users: deletes leftover test logins with no student/teacher record.
+    "remove-orphan-users": "scripts/remove-orphan-users.ts",
   },
   outdir: "dist",
   bundle: true,
@@ -33,4 +35,4 @@ await build({
   },
 });
 
-console.log("server built -> dist/index.js, dist/create-admin.js, dist/seed.js, dist/backfill-viewable-passwords.js");
+console.log("server built -> dist/index.js, dist/create-admin.js, dist/seed.js, dist/backfill-viewable-passwords.js, dist/remove-orphan-users.js");
