@@ -273,6 +273,7 @@ Now go back and do **M1-9 to M1-14** with these accounts. From here on, use **Ms
 
 ## M8. Classwork (Ms. Sadia Rehman, DEM-101 · 2026 A)
 
+- [ ] **M8-0** *(admin, before anything else in M8)* Academics → Courses → DEM-101 → set the assessment scheme to **Quiz 15, Assignment 15, Mid 30, Final 40** (total 100). Without a scheme the assignment form has no **Marksheet** or **Weightage** fields.
 - [ ] **M8-1** Create topics **Week 1 - Introduction to Events** and **Week 2 - Planning Process**; drag Week 2 above Week 1, refresh → order kept; put them back.
 - [ ] **M8-2** Create an assignment under Week 1:
 
@@ -282,20 +283,20 @@ Now go back and do **M1-9 to M1-14** with these accounts. From here on, use **Ms
   | Instructions | Propose a 200-guest corporate dinner: theme, venue, rough budget and timeline (2 pages). |
   | Points | 10 |
   | Due | 7 days from now, 11:59 PM |
-  | Marks category | Assignment |
-  | Weightage | 5 |
+  | Marksheet *(dropdown)* | Assignment |
+  | Weightage *(appears after you pick the Marksheet category)* | 5 |
   | Attachment | a small PDF (e.g. a proposal template) |
 
   → Publish. Ahsan sees it on Classwork.
 - [ ] **M8-3** **Edge** Due date yesterday → "Due date must be in the future."; points `-5`, `7.5` or `100001` → refused.
 - [ ] **M8-4** Create **Reading: Types of Events** with **no points**, due 3 days from now, **Save as draft** → Ahsan can't see it; then publish it → he can.
-- [ ] **M8-5** Create **Venue Checklist** (points 10, no marks category), **schedule** it for **3 minutes from now**, due 5 days from now → appears for Ahsan at that time. **Edge** set its due date *before* the publish time → "Due date must be after the scheduled publish time."
+- [ ] **M8-5** Create **Venue Checklist** (points 10, Marksheet = Not on marksheet), **schedule** it for **3 minutes from now**, due 5 days from now → appears for Ahsan at that time. **Edge** set its due date *before* the publish time → "Due date must be after the scheduled publish time."
 - [ ] **M8-6** Create two materials under Week 1:
   - **Event Management Overview** — link `https://en.wikipedia.org/wiki/Event_management`
   - **Week 1 Slides** — attach a small PDF or PPTX
 
   → Ahsan sees both; clicking the material's stream post scrolls to it on Classwork and outlines it.
-- [ ] **M8-7** Create a digital quiz: **Online Quiz 1 - Event Types**, points **20**, due 2 days from now, category **Quiz**, weightage **5** → publish.
+- [ ] **M8-7** Create a digital quiz: **Online Quiz 1 - Event Types**, points **20**, due 2 days from now, Marksheet **Quiz**, weightage **5** → publish.
 - [ ] **M8-8** Edit Event Concept Proposal: due date one day later → Ahsan sees the new date.
 - [ ] **M8-9** Close **Venue Checklist** → students can no longer submit. **Edge** closing a draft → "Only published assignments can be closed."
 - [ ] **M8-10** Delete **Reading: Types of Events** → gone from Classwork and the stream.
@@ -319,7 +320,7 @@ Now go back and do **M1-9 to M1-14** with these accounts. From here on, use **Ms
 
 **Scheme** (admin, Academics → Courses → DEM-101 → assessment scheme)
 
-- [ ] **M10-1** Set: **Quiz 15, Assignment 15, Mid 30, Final 40** (total 100) → saved.
+- [ ] **M10-1** The scheme set in M8-0 shows on DEM-101: **Quiz 15, Assignment 15, Mid 30, Final 40**.
 - [ ] **M10-2** **Edge** Change Final to 50 (total 110) → refused or warned. Put it back to 40.
 
 **Physical items** (Ms. Sadia Rehman → Marks → DEM-101 · 2026 A)
