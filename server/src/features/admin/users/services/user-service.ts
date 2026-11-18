@@ -252,6 +252,9 @@ export async function setUserStatus(
     data: {
       status,
       archivedAt: status === UserStatus.ARCHIVED ? new Date() : null,
+      // Unlocking (back to Active) starts the wrong-password count afresh, so one
+      // more typo doesn't lock the account again straight away.
+      ...(status === UserStatus.ACTIVE ? { failedLoginAttempts: 0, lockedAt: null } : {}),
     },
     select: summarySelect,
   });
@@ -298,7 +301,7 @@ export async function resetPassword(
 
   await prisma.user.update({
     where: { id: userId },
-    data: { ...passwordData, mustChangePassword: true },
+    data: { ...passwordData, mustChangePassword: true, failedLoginAttempts: 0 },
   });
 
   await recordAuditEvent({

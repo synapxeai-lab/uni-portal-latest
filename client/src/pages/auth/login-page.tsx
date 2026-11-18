@@ -34,8 +34,10 @@ function LoginForm() {
         await api.post("/auth/login", values);
       } catch (loginError) {
         const body = getApiError(loginError);
+        // The server's message carries the "N attempts left" warning and the
+        // locked-account notice, so show it as-is.
         setError(
-          body?.code === "INVALID_CREDENTIALS" || body?.code === "VALIDATION"
+          body?.code === "VALIDATION"
             ? "Incorrect email or password."
             : (body?.message ?? "Couldn't sign in. Please try again."),
         );

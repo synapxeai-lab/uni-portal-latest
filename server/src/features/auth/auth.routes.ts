@@ -23,8 +23,22 @@ authRouter.post("/login", async (req, res) => {
     userAgent: req.get("user-agent") ?? null,
   });
 
-  if (!result) {
-    throw new HttpError(401, "Incorrect email or password.", "INVALID_CREDENTIALS");
+  if ("reason" in result) {
+    if (result.reason === "ACCOUNT_LOCKED") {
+      throw new HttpError(
+        403,
+        "Your account is locked after too many wrong passwords. Please contact the administrator to unlock it.",
+        "ACCOUNT_LOCKED",
+      );
+    }
+    const left = result.attemptsLeft;
+    throw new HttpError(
+      401,
+      left === undefined
+        ? "Incorrect email or password."
+        : `Incorrect email or password. ${left} attempt${left === 1 ? "" : "s"} left before your account is locked.`,
+      "INVALID_CREDENTIALS",
+    );
   }
 
   res.cookie(SESSION_COOKIE, result.token, sessionCookieOptions(result.maxAgeMs));

@@ -8,11 +8,20 @@ import { invalidateAdmin } from "@/lib/cache/tags";
 import { prisma } from "@/lib/prisma";
 import { getSystemSettings } from "@/lib/system-settings";
 import { signSessionToken } from "@/lib/auth/tokens";
-import { ActivityAction, UserStatus } from "@/generated/prisma/enums";
+import { ActivityAction, UserRole, UserStatus } from "@/generated/prisma/enums";
 
 // After this many consecutive failed attempts, the account is auto-locked
 // (UserStatus.LOCKED) until an admin sets it back to Active from /admin/users.
-const FAILED_LOGIN_LOCK_THRESHOLD = 5;
+// Admins are never auto-locked: the whole institute depends on them signing in,
+// and a locked admin could only be recovered from the server. Their failed
+// attempts are still recorded (LoginAttempt) for the audit trail.
+export const FAILED_LOGIN_LOCK_THRESHOLD = 8;
+// From this many attempts left (i.e. from the 3rd wrong password), a wrong
+// password says how many remain.
+const WARN_WHEN_ATTEMPTS_LEFT = 5;
+// Wrong passwords only add up while they come close together: if the previous
+// wrong password was longer ago than this, the count starts again at 1.
+const FAILED_LOGIN_WINDOW_MS = 15 * 60_000;
 
 // A real bcrypt hash (of a random string) compared against when the email is
 // unknown, so a miss costs the same time as a wrong password and response
@@ -30,15 +39,22 @@ export interface LoginSuccess {
 }
 
 /**
- * Verifies credentials and opens a session. Returns null on any failure - the
- * caller always answers with the same generic message, so the response never
- * reveals whether the email exists or why the attempt was refused.
+ * Why a sign-in was refused. Unknown emails, wrong passwords and inactive
+ * accounts are all INVALID_CREDENTIALS; only a locked account says so (with
+ * the attempt that locks it), and a wrong password says how many tries are
+ * left once few remain - so a user knows to stop before being locked out.
  */
+export type LoginFailure =
+  | { reason: "INVALID_CREDENTIALS"; attemptsLeft?: number }
+  | { reason: "ACCOUNT_LOCKED" };
+
+/** Verifies credentials and opens a session, or says why it refused. */
 export async function login(
   rawEmail: string,
   password: string,
   context: LoginContext,
-): Promise<LoginSuccess | null> {
+): Promise<LoginSuccess | LoginFailure> {
+  const invalid: LoginFailure = { reason: "INVALID_CREDENTIALS" };
   const email = rawEmail.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email } });
 
@@ -57,20 +73,32 @@ export async function login(
   if (!user?.passwordHash) {
     await bcrypt.compare(password, TIMING_DUMMY_HASH);
     await recordAttempt(false);
-    return null;
+    return invalid;
   }
 
   if (user.status === UserStatus.LOCKED) {
     await recordAttempt(false);
-    return null;
+    return { reason: "ACCOUNT_LOCKED" };
   }
 
   const isValid = await bcrypt.compare(password, user.passwordHash);
 
   if (!isValid) {
+    // The previous wrong password, read before this one is recorded.
+    const previousFailure = await prisma.loginAttempt.findFirst({
+      where: { userId: user.id, succeeded: false },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
     await recordAttempt(false);
 
-    const failedLoginAttempts = user.failedLoginAttempts + 1;
+    if (user.role === UserRole.ADMIN) {
+      return invalid;
+    }
+
+    const recent =
+      previousFailure !== null && Date.now() - previousFailure.createdAt.getTime() <= FAILED_LOGIN_WINDOW_MS;
+    const failedLoginAttempts = (recent ? user.failedLoginAttempts : 0) + 1;
     const shouldLock =
       failedLoginAttempts >= FAILED_LOGIN_LOCK_THRESHOLD && user.status === UserStatus.ACTIVE;
 
@@ -96,7 +124,13 @@ export async function login(
     }
     invalidateAdmin();
 
-    return null;
+    if (shouldLock) {
+      return { reason: "ACCOUNT_LOCKED" };
+    }
+    const attemptsLeft = FAILED_LOGIN_LOCK_THRESHOLD - failedLoginAttempts;
+    return user.status === UserStatus.ACTIVE && attemptsLeft <= WARN_WHEN_ATTEMPTS_LEFT
+      ? { reason: "INVALID_CREDENTIALS", attemptsLeft }
+      : invalid;
   }
 
   // Only ACTIVE and PENDING_PASSWORD_CHANGE accounts may sign in; the latter
@@ -104,7 +138,7 @@ export async function login(
   // change-password flow rather than being locked out entirely.
   if (user.status !== UserStatus.ACTIVE && user.status !== UserStatus.PENDING_PASSWORD_CHANGE) {
     await recordAttempt(false);
-    return null;
+    return invalid;
   }
 
   // One UserLoginSession row per sign-in, keyed by the JWT's jti - this is
