@@ -417,7 +417,7 @@ Now go back and do **M1-9 to M1-14** with these accounts. From here on, use **Ms
 
 ## M19. Dashboards, sidebar and permissions
 
-- [ ] **M19-1** Admin dashboard: only the University section: Students, Teachers, Diplomas, Courses, **Teachers to be assigned**, **Awaiting approval payments**; each card opens its page.
+- [ ] **M19-1** Admin dashboard: only the University section: Students, Teachers, Diplomas, Courses, **Teachers to be assigned**, **Awaiting approval payments**, **Unpaid fees**; each card opens its page.
 - [ ] **M19-2** Ms. Sadia Rehman's dashboard: term banner, then **Active classes**, **Archived classes**, **Pending reviews** only.
 - [ ] **M19-3** Ahsan's dashboard: My studies (roll no EITHM-26-EM-001, CGPA, attendance, fees) and upcoming deadlines.
 - [ ] **M19-4** Admin sidebar groups: Overview · Schedule · Learning · Academics · People · Assessment · Finance · Administration · Account. No Classrooms, no To review, no Take attendance.

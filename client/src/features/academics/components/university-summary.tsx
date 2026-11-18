@@ -8,6 +8,7 @@ import {
   Library,
   Presentation,
   Receipt,
+  ReceiptText,
   UserRoundX,
 } from "lucide-react";
 
@@ -30,7 +31,7 @@ type Summary =
   | (Periods & {
       role: "ADMIN";
       counts: { teachers: number; students: number; programmes: number; diplomas: number; courses: number; offerings: number; unassigned: number };
-      fees: { pendingApprovals: number; unpaidAmount: number };
+      fees: { pendingApprovals: number; unpaid: number };
     })
   | (Periods & {
       role: "TEACHER";
@@ -121,7 +122,14 @@ export function UniversitySummary() {
               label="Awaiting approval payments"
               value={fees.pendingApprovals}
               icon={Receipt}
-              hint={`${formatRs(fees.unpaidAmount)} unpaid`}
+              href="/admin/fees"
+            />
+            <StatCard
+              compact
+              tone={fees.unpaid ? "warning" : "success"}
+              label="Unpaid fees"
+              value={fees.unpaid}
+              icon={ReceiptText}
               href="/admin/fees"
             />
           </DashboardStatGrid>

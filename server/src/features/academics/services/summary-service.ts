@@ -20,14 +20,14 @@ export async function adminSummary() {
     prisma.course.count(),
     prisma.sectionCourse.count(),
     prisma.challan.count({ where: { status: "PENDING_APPROVAL" } }),
-    prisma.challan.aggregate({ where: { status: "UNPAID" }, _sum: { amount: true } }),
+    prisma.challan.count({ where: { status: "UNPAID" } }),
   ]);
   const unassigned = await prisma.sectionCourse.count({ where: { teacherId: null } });
   return {
     role: "ADMIN" as const,
     ...periods,
     counts: { teachers, students, programmes, diplomas, courses, offerings, unassigned },
-    fees: { pendingApprovals: pendingChallans, unpaidAmount: unpaid._sum.amount ?? 0 },
+    fees: { pendingApprovals: pendingChallans, unpaid },
   };
 }
 

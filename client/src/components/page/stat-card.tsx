@@ -41,12 +41,12 @@ export function StatCard({
   compact = false,
 }: StatCardProps) {
   const body = (
-    // Icon tile, then an uppercase label over a large value. On small phones
-    // the tile stacks above the text.
+    // Icon tile, then an uppercase label over a large value. Compact cards
+    // (dashboard grids, 5 across) and small phones stack the tile above the text.
     <CardContent
       className={cn(
         "flex h-full items-center max-[480px]:flex-col max-[480px]:items-start max-[480px]:gap-3 max-[480px]:p-4",
-        compact ? "min-h-[104px] gap-4 px-5 py-4" : "min-h-[136px] gap-[18px] p-6",
+        compact ? "min-h-[104px] flex-col items-start gap-3 px-5 py-4" : "min-h-[136px] gap-[18px] p-6",
       )}
     >
       {Icon ? (
@@ -63,7 +63,7 @@ export function StatCard({
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <p
           className={cn(
-            "font-semibold uppercase leading-snug [overflow-wrap:anywhere]",
+            "font-semibold uppercase leading-snug break-words",
             compact
               ? "text-[11px] tracking-[0.04em] text-foreground"
               : "text-[13px] tracking-[0.02em] text-muted-foreground",
@@ -80,7 +80,7 @@ export function StatCard({
           {value}
         </p>
         {hint ? (
-          <p className="text-[0.8rem] leading-snug text-muted-foreground [overflow-wrap:anywhere]">
+          <p className="text-[0.8rem] leading-snug text-muted-foreground break-words">
             {hint}
           </p>
         ) : null}
